@@ -14,7 +14,9 @@ import {
   Layers,
   BarChart3,
   Activity,
-  RefreshCw
+  RefreshCw,
+  Ban,
+  DollarSign
 } from 'lucide-react';
 import {
   Sheet,
@@ -56,11 +58,15 @@ const ControlPanel = ({
     marketSnapshot,
     regenerateGrid,
     getArmedCount,
-    getExecutedCount
+    getExecutedCount,
+    showCancelAllDialog,
+    showSquareOffAllDialog,
+    getTotalPnL
   } = useTradingStore();
   
   const armedCount = getArmedCount();
   const executedCount = getExecutedCount();
+  const totalPnL = getTotalPnL();
   
   // Get mode display name
   const getModeDisplay = () => {
@@ -72,9 +78,9 @@ const ControlPanel = ({
   };
   
   return (
-    <div className="flex items-center justify-between gap-4 p-3 md:p-4 bg-[#120A14] border-b border-[#3D2840]">
+    <div className="flex items-center justify-between gap-2 md:gap-4 p-2 md:p-4 bg-[#120A14] border-b border-[#3D2840]">
       {/* Left: Current Price + Market Data */}
-      <div className="flex items-center gap-3 md:gap-6">
+      <div className="flex items-center gap-2 md:gap-6">
         <div data-testid="current-price-display">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono uppercase tracking-wider text-[#F555A2]">NIFTY</span>
@@ -84,21 +90,18 @@ const ControlPanel = ({
               <Pause className="text-[#F555A2]/50" size={14} />
             )}
           </div>
-          <span className="text-2xl md:text-4xl font-mono font-bold text-white" style={{ textShadow: '0 0 20px rgba(245, 85, 162, 0.6)' }}>
+          <span className="text-xl md:text-3xl font-mono font-bold text-white" style={{ textShadow: '0 0 20px rgba(245, 85, 162, 0.6)' }}>
             ₹{currentPrice.toFixed(2)}
           </span>
           {/* Bid/Ask display */}
-          <div className="flex gap-2 text-[9px] md:text-[10px] font-mono mt-0.5">
+          <div className="hidden md:flex gap-2 text-[9px] md:text-[10px] font-mono mt-0.5">
             <span className="text-green-400">B: ₹{marketSnapshot.bestBid?.toFixed(2)}</span>
             <span className="text-red-400">A: ₹{marketSnapshot.bestAsk?.toFixed(2)}</span>
-            <span className="text-[#F555A2]/50">
-              Spread: ₹{((marketSnapshot.bestAsk || 0) - (marketSnapshot.bestBid || 0)).toFixed(2)}
-            </span>
           </div>
         </div>
         
         {/* Stats */}
-        <div className="hidden md:flex gap-4 ml-4 text-xs font-mono">
+        <div className="hidden lg:flex gap-4 ml-2 text-xs font-mono">
           <div className="text-center">
             <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Armed</span>
             <span className="text-[#E0FF66] font-bold text-lg">{armedCount}</span>
@@ -107,7 +110,12 @@ const ControlPanel = ({
             <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Open</span>
             <span className="text-white font-bold text-lg">{executedCount}</span>
           </div>
-          {/* Grid Mode indicator */}
+          <div className="text-center">
+            <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">P&L</span>
+            <span className={`font-bold text-sm ${totalPnL >= 0 ? 'text-[#E0FF66]' : 'text-red-400'}`}>
+              {totalPnL >= 0 ? '+' : ''}₹{totalPnL.toFixed(2)}
+            </span>
+          </div>
           <div className="text-center">
             <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Mode</span>
             <span className={`font-bold text-xs ${
@@ -117,22 +125,15 @@ const ControlPanel = ({
               {getModeDisplay()}
             </span>
           </div>
-          {/* Auto Recalc indicator */}
-          {settings.autoRecalc && (
-            <div className="text-center">
-              <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Auto</span>
-              <RefreshCw size={14} className="text-[#E0FF66] animate-spin mx-auto" style={{ animationDuration: '3s' }} />
-            </div>
-          )}
         </div>
       </div>
       
-      {/* Center: BUY/SELL Toggle + Quantity */}
-      <div className="flex items-center gap-2 md:gap-4">
+      {/* Center: BUY/SELL Toggle + Quantity + Bulk Actions */}
+      <div className="flex items-center gap-1 md:gap-3">
         {/* Side Toggle */}
         <div className="flex rounded-full overflow-hidden border border-[#3D2840]" data-testid="side-toggle">
           <button
-            className={`px-3 md:px-5 py-2 text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
+            className={`px-2 md:px-4 py-1.5 md:py-2 text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
               side === Side.BUY 
                 ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]' 
                 : 'bg-transparent text-[#F555A2]/60 hover:text-white'
@@ -144,7 +145,7 @@ const ControlPanel = ({
             <span className="hidden md:inline">Buy</span>
           </button>
           <button
-            className={`px-3 md:px-5 py-2 text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
+            className={`px-2 md:px-4 py-1.5 md:py-2 text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
               side === Side.SELL 
                 ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
                 : 'bg-transparent text-[#F555A2]/60 hover:text-white'
@@ -158,41 +159,74 @@ const ControlPanel = ({
         </div>
         
         {/* Quantity */}
-        <div className="flex items-center gap-1 md:gap-2 bg-[#0A0510] rounded-lg px-2 md:px-3 py-1 border border-[#3D2840]">
-          <span className="text-[10px] md:text-xs text-[#F555A2]/70">Qty</span>
+        <div className="flex items-center gap-1 bg-[#0A0510] rounded-lg px-2 py-1 border border-[#3D2840]">
+          <span className="text-[10px] text-[#F555A2]/70 hidden md:inline">Qty</span>
           <button
-            className="w-5 h-5 md:w-6 md:h-6 rounded bg-[#3D2840] text-white hover:bg-[#F555A2]/30 transition-colors text-sm"
+            className="w-5 h-5 rounded bg-[#3D2840] text-white hover:bg-[#F555A2]/30 transition-colors text-sm"
             onClick={() => setQuantity(quantity - 1)}
             disabled={quantity <= 1}
             data-testid="qty-decrease"
           >
             -
           </button>
-          <span className="font-mono font-bold text-white w-6 md:w-8 text-center text-sm md:text-base" data-testid="quantity-display">
+          <span className="font-mono font-bold text-white w-6 text-center text-sm" data-testid="quantity-display">
             {quantity}
           </span>
           <button
-            className="w-5 h-5 md:w-6 md:h-6 rounded bg-[#3D2840] text-white hover:bg-[#F555A2]/30 transition-colors text-sm"
+            className="w-5 h-5 rounded bg-[#3D2840] text-white hover:bg-[#F555A2]/30 transition-colors text-sm"
             onClick={() => setQuantity(quantity + 1)}
             data-testid="qty-increase"
           >
             +
           </button>
         </div>
+        
+        {/* Bulk Action Buttons */}
+        <div className="flex gap-1">
+          {/* Cancel All Armed */}
+          {armedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={showCancelAllDialog}
+              className="border-red-500/50 text-red-400 hover:bg-red-500/20 hover:border-red-500 text-[10px] px-2 h-8"
+              data-testid="cancel-all-button"
+            >
+              <Ban size={12} className="mr-1" />
+              <span className="hidden md:inline">Cancel All</span>
+              <span className="md:hidden">×{armedCount}</span>
+            </Button>
+          )}
+          
+          {/* Square Off All */}
+          {executedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={showSquareOffAllDialog}
+              className="border-[#E0FF66]/50 text-[#E0FF66] hover:bg-[#E0FF66]/20 hover:border-[#E0FF66] text-[10px] px-2 h-8"
+              data-testid="square-off-all-button"
+            >
+              <DollarSign size={12} className="mr-1" />
+              <span className="hidden md:inline">Exit All</span>
+              <span className="md:hidden">₹{executedCount}</span>
+            </Button>
+          )}
+        </div>
       </div>
       
       {/* Right: Controls */}
-      <div className="flex items-center gap-1 md:gap-2">
+      <div className="flex items-center gap-1">
         {/* Manual Recalc */}
         <Button
           variant="outline"
           size="icon"
           onClick={() => regenerateGrid(true)}
-          className="border-[#3D2840] hover:bg-[#E0FF66]/20 hover:border-[#E0FF66] h-8 w-8 md:h-9 md:w-9"
+          className="border-[#3D2840] hover:bg-[#E0FF66]/20 hover:border-[#E0FF66] h-7 w-7 md:h-8 md:w-8"
           title="Recalculate Grid"
           data-testid="recalc-button"
         >
-          <RefreshCw size={16} />
+          <RefreshCw size={14} />
         </Button>
         
         {/* Play/Pause */}
@@ -200,10 +234,10 @@ const ControlPanel = ({
           variant="outline"
           size="icon"
           onClick={onToggle}
-          className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-8 w-8 md:h-9 md:w-9"
+          className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-7 w-7 md:h-8 md:w-8"
           data-testid="play-pause-button"
         >
-          {isRunning ? <Pause size={16} /> : <Play size={16} />}
+          {isRunning ? <Pause size={14} /> : <Play size={14} />}
         </Button>
         
         {/* Reset */}
@@ -214,10 +248,10 @@ const ControlPanel = ({
             onReset();
             resetAll();
           }}
-          className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-8 w-8 md:h-9 md:w-9"
+          className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-7 w-7 md:h-8 md:w-8"
           data-testid="reset-button"
         >
-          <RotateCcw size={16} />
+          <RotateCcw size={14} />
         </Button>
         
         {/* Settings */}
@@ -226,10 +260,10 @@ const ControlPanel = ({
             <Button
               variant="outline"
               size="icon"
-              className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-8 w-8 md:h-9 md:w-9"
+              className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-7 w-7 md:h-8 md:w-8"
               data-testid="settings-button"
             >
-              <Settings size={16} />
+              <Settings size={14} />
             </Button>
           </SheetTrigger>
           <SheetContent className="bg-[#120A14] border-[#3D2840] overflow-y-auto">
@@ -262,30 +296,23 @@ const ControlPanel = ({
                       <SelectItem value={GridMode.LTP_LADDER} className="text-white hover:bg-[#3D2840]">
                         <div className="flex items-center gap-2">
                           <BarChart3 size={14} className="text-[#E0FF66]" />
-                          <span>LTP Ladder (Mid-Anchored)</span>
+                          <span>LTP Ladder</span>
                         </div>
                       </SelectItem>
                       <SelectItem value={GridMode.DEPTH_LADDER} className="text-white hover:bg-[#3D2840]">
                         <div className="flex items-center gap-2">
                           <Layers size={14} className="text-[#F555A2]" />
-                          <span>Depth Ladder (Bid/Ask)</span>
+                          <span>Depth Ladder</span>
                         </div>
                       </SelectItem>
                       <SelectItem value={GridMode.LIQUIDITY_LADDER} className="text-white hover:bg-[#3D2840]">
                         <div className="flex items-center gap-2">
                           <Activity size={14} className="text-blue-400" />
-                          <span>Liquidity Ladder (Impact Price)</span>
+                          <span>Liquidity Ladder</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-[#F555A2]/50">
-                    {settings.gridMode === GridMode.LTP_LADDER 
-                      ? 'Symmetric ladder centered around mid-price. Stable and clean.'
-                      : settings.gridMode === GridMode.DEPTH_LADDER
-                      ? 'Anchored to best bid/ask. Moves with order book.'
-                      : 'Based on cumulative order book depth. Shows impact price levels.'}
-                  </p>
                 </div>
                 
                 {/* Auto Recalc Toggle */}
@@ -316,9 +343,6 @@ const ControlPanel = ({
                     className="w-full"
                     data-testid="levels-slider"
                   />
-                  <p className="text-[10px] text-[#F555A2]/50">
-                    Total blocks: {settings.levelsPerSide * 2 + 1}
-                  </p>
                 </div>
                 
                 {/* Tick Size */}
@@ -336,9 +360,6 @@ const ControlPanel = ({
                     className="w-full"
                     data-testid="tick-size-slider"
                   />
-                  <p className="text-[10px] text-[#F555A2]/50">
-                    Minimum price increment
-                  </p>
                 </div>
               </div>
               
@@ -366,9 +387,6 @@ const ControlPanel = ({
                     className="w-full"
                     data-testid="volatility-slider"
                   />
-                  <p className="text-[10px] text-[#F555A2]/50">
-                    Higher = bigger price swings
-                  </p>
                 </div>
                 
                 {/* Tick Rate */}
@@ -388,9 +406,6 @@ const ControlPanel = ({
                     className="w-full"
                     data-testid="tickrate-slider"
                   />
-                  <p className="text-[10px] text-[#F555A2]/50">
-                    Lower = faster updates (more CPU)
-                  </p>
                 </div>
               </div>
               
