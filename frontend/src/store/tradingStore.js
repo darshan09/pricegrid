@@ -684,6 +684,7 @@ export const useTradingStore = create((set, get) => ({
         armedOrders: newArmed,
         trades: [...trades, ...newTrades],
       });
+      get().saveToStorage();
     }
   },
   
