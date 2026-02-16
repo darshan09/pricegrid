@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-// Generate unique ID
+// Generate unique ID for orders/trades only
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 // Block states
@@ -42,6 +42,11 @@ function uniqueSortedPrices(prices) {
   return [...new Set(prices.map(p => p.toFixed(2)).map(Number))].sort((a, b) => b - a);
 }
 
+// Generate DETERMINISTIC block ID from price, mode, side
+function generateBlockId(price, mode, side) {
+  return `block-${mode}-${side}-${price.toFixed(2)}`;
+}
+
 // ============ OPTION A: LTP-Based Tick Ladder ============
 function generateLtpLadder(snapshot, config) {
   const { ltp, bestBid, bestAsk, tickSize } = snapshot;
@@ -51,8 +56,7 @@ function generateLtpLadder(snapshot, config) {
     ? (bestBid + bestAsk) / 2
     : ltp;
 
-  // Use fixed step based on tick size (more stable than spread-based)
-  // Step = tickSize * 5 for reasonable spacing
+  // Fixed step for stability
   const step = tickSize * 5;
 
   const prices = [];
@@ -72,45 +76,37 @@ function generateDepthLadder(snapshot, config, side) {
   const { levelsPerSide } = config;
 
   if (!bestBid || !bestAsk) {
-    console.warn("No depth data, falling back to LTP ladder");
     return generateLtpLadder(snapshot, config);
   }
 
   const anchor = side === Side.BUY ? bestAsk : bestBid;
-
   const prices = [];
 
   for (let i = 0; i < levelsPerSide * 2 + 1; i++) {
     const offset = i - levelsPerSide;
-
     let raw;
     if (side === Side.BUY) {
       raw = anchor + offset * tickSize;
     } else {
       raw = anchor - offset * tickSize;
     }
-
     prices.push(roundToTick(raw, tickSize));
   }
 
   return uniqueSortedPrices(prices);
 }
 
-// ============ OPTION C: Liquidity Weighted Levels (Phase 2) ============
+// ============ OPTION C: Liquidity Weighted Levels ============
 function generateLiquidityLadder(snapshot, config, side) {
-  const { asks, bids, tickSize, bestAsk, bestBid, ltp } = snapshot;
+  const { asks, bids, tickSize, bestAsk, bestBid } = snapshot;
   const { levelsPerSide, qtyThresholds = [1, 5, 10, 25, 50, 100, 250, 500] } = config;
   
-  // Use asks for BUY (we're buying into asks), bids for SELL
   const orderBook = side === Side.BUY ? asks : bids;
   
-  // Fallback if no order book data
   if (!orderBook || orderBook.length === 0) {
-    console.warn("No order book data, falling back to Depth ladder");
     return generateDepthLadder(snapshot, config, side);
   }
   
-  // Sort by price (ascending for asks, descending for bids)
   const sorted = [...orderBook].sort((a, b) => 
     side === Side.BUY ? a.price - b.price : b.price - a.price
   );
@@ -129,11 +125,9 @@ function generateLiquidityLadder(snapshot, config, side) {
       }
     }
     
-    // Stop once we have enough levels
     if (impactPrices.length >= levelsPerSide * 2 + 1) break;
   }
   
-  // If we don't have enough levels, fill with tick-based levels
   const anchor = side === Side.BUY ? bestAsk : bestBid;
   while (impactPrices.length < levelsPerSide * 2 + 1) {
     const lastPrice = impactPrices[impactPrices.length - 1] || anchor;
@@ -146,49 +140,12 @@ function generateLiquidityLadder(snapshot, config, side) {
   return uniqueSortedPrices(impactPrices);
 }
 
-// Generate price blocks from prices array
-const generateBlocksFromPrices = (prices, currentLtp, existingBlocks = [], existingOrders = []) => {
-  // Create a map of existing blocks by target price (to preserve IDs and states)
-  const existingByPrice = new Map();
-  existingBlocks.forEach(block => {
-    existingByPrice.set(block.targetPrice, block);
-  });
-  
-  // Create a map of armed orders by target price
-  const armedOrdersByPrice = new Map();
-  existingOrders.forEach(order => {
-    if (order.state === 'ARMED') {
-      armedOrdersByPrice.set(order.targetPrice, order);
-    }
-  });
-  
-  return prices.map(targetPrice => {
-    // Check if this price level already has a block
-    const existingBlock = existingByPrice.get(targetPrice);
-    
-    if (existingBlock) {
-      // Keep the same block (preserves ID and state)
-      return existingBlock;
-    }
-    
-    // Create new block for new price level
-    return {
-      id: generateId(),
-      label: `₹${targetPrice.toLocaleString('en-IN')}`,
-      targetPrice,
-      state: BlockState.IDLE,
-      createdAt: Date.now(),
-    };
-  });
-};
-
 // Simulate order book for demo
 const generateSimulatedOrderBook = (ltp, tickSize, levels = 20) => {
   const asks = [];
   const bids = [];
   
   for (let i = 1; i <= levels; i++) {
-    // Random qty with some large blocks at certain levels
     const isLargeBlock = Math.random() < 0.15;
     const baseQty = Math.floor(Math.random() * 50) + 10;
     const qty = isLargeBlock ? baseQty * 10 : baseQty;
@@ -207,13 +164,14 @@ const generateSimulatedOrderBook = (ltp, tickSize, levels = 20) => {
   return { asks, bids };
 };
 
+// ============ STORE ============
 export const useTradingStore = create((set, get) => ({
   // Current market state
   basePrice: 2006,
   currentPrice: 2006.16,
   lastRecalcPrice: 2006.16,
   
-  // Market snapshot for ladder generation
+  // Market snapshot
   marketSnapshot: {
     ltp: 2006.16,
     bestBid: 2006.00,
@@ -227,23 +185,25 @@ export const useTradingStore = create((set, get) => ({
   side: Side.BUY,
   quantity: 1,
   
-  // Price blocks
-  blocks: [],
+  // Grid prices (just numbers - visual suggestions only)
+  gridPrices: [],
   
-  // Orders and trades
-  orders: [],
+  // ===== INDEPENDENT STATE =====
+  // Armed orders - SEPARATE from grid, keyed by targetPrice
+  armedOrders: new Map(), // Map<targetPrice, OrderIntent>
+  
+  // Executed trades
   trades: [],
   
   // Recalculation throttle
   lastRecalcTime: 0,
-  recalcThrottleMs: 200, // Max 5 times per second
-  isRegenerating: false, // Flag to prevent clicks during regeneration
+  recalcThrottleMs: 200,
   
   // Confirmation dialog state
   confirmDialog: {
     isOpen: false,
-    type: null, // 'SQUARE_OFF' | 'CANCEL_ORDER'
-    blockId: null,
+    type: null,
+    targetPrice: null,
     message: '',
   },
   
@@ -251,133 +211,126 @@ export const useTradingStore = create((set, get) => ({
   settings: {
     volatility: 0.0005,
     tickRate: 50,
-    gridSize: { rows: 6, cols: 8 },
     gridMode: GridMode.LTP_LADDER,
     levelsPerSide: 12,
     tickSize: 0.05,
     qtyThresholds: [1, 5, 10, 25, 50, 100, 250, 500],
-    autoRecalc: false, // Disabled by default - user can enable if needed
-    recalcStepMultiplier: 5, // Only recalc when price moves 5+ steps
+    autoRecalc: false,
+    recalcStepMultiplier: 5,
   },
   
-  // Open confirmation dialog
-  openConfirmDialog: (type, blockId, message) => {
+  // ===== HELPERS =====
+  
+  // Get block state by checking armed orders and trades
+  getBlockState: (targetPrice) => {
+    const { armedOrders, trades } = get();
+    
+    // Check if there's an active trade at this price
+    const activeTrade = trades.find(t => 
+      t.targetPrice === targetPrice && !t.isSquareOff
+    );
+    const squaredOff = activeTrade && trades.find(t => 
+      t.originalTradeId === activeTrade.id
+    );
+    
+    if (activeTrade && !squaredOff) {
+      return BlockState.EXECUTED;
+    }
+    
+    // Check if armed
+    if (armedOrders.has(targetPrice)) {
+      return BlockState.ARMED;
+    }
+    
+    return BlockState.IDLE;
+  },
+  
+  // Get armed order for a price
+  getArmedOrder: (targetPrice) => {
+    return get().armedOrders.get(targetPrice);
+  },
+  
+  // Get trade for a price
+  getTradeForPrice: (targetPrice) => {
+    const { trades } = get();
+    return trades.find(t => t.targetPrice === targetPrice && !t.isSquareOff);
+  },
+  
+  // ===== DIALOG =====
+  
+  openConfirmDialog: (type, targetPrice, message) => {
     set({
-      confirmDialog: {
-        isOpen: true,
-        type,
-        blockId,
-        message,
-      }
+      confirmDialog: { isOpen: true, type, targetPrice, message }
     });
   },
   
-  // Close confirmation dialog
   closeConfirmDialog: () => {
     set({
-      confirmDialog: {
-        isOpen: false,
-        type: null,
-        blockId: null,
-        message: '',
-      }
+      confirmDialog: { isOpen: false, type: null, targetPrice: null, message: '' }
     });
   },
   
-  // Confirm dialog action
   confirmDialogAction: () => {
-    const { confirmDialog, blocks, orders, trades, currentPrice, side, quantity } = get();
-    const { type, blockId } = confirmDialog;
+    const { confirmDialog, armedOrders, trades, currentPrice, side } = get();
+    const { type, targetPrice } = confirmDialog;
     
     if (type === 'CANCEL_ORDER') {
-      // Cancel the armed order
-      set({
-        blocks: blocks.map(b =>
-          b.id === blockId && b.state === BlockState.ARMED
-            ? { ...b, state: BlockState.IDLE, armedAt: undefined }
-            : b
-        ),
-        orders: orders.map(o =>
-          o.blockId === blockId && o.state === 'ARMED'
-            ? { ...o, state: 'CANCELLED' }
-            : o
-        ),
-      });
-    } else if (type === 'SQUARE_OFF') {
-      // Create opposite trade to square off
-      const block = blocks.find(b => b.id === blockId);
-      const originalTrade = trades.find(t => t.blockId === blockId);
+      // Remove from armed orders
+      const newArmed = new Map(armedOrders);
+      newArmed.delete(targetPrice);
+      set({ armedOrders: newArmed });
       
-      if (block && originalTrade) {
+    } else if (type === 'SQUARE_OFF') {
+      const originalTrade = trades.find(t => 
+        t.targetPrice === targetPrice && !t.isSquareOff
+      );
+      
+      if (originalTrade) {
         const squareOffSide = originalTrade.side === Side.BUY ? Side.SELL : Side.BUY;
         const now = Date.now();
         
-        // Add square-off trade
         const squareOffTrade = {
           id: generateId(),
           ts: now,
           side: squareOffSide,
           qty: originalTrade.qty,
-          triggerPrice: currentPrice,
+          targetPrice: currentPrice,
           execPrice: currentPrice,
-          blockId: blockId,
           isSquareOff: true,
           originalTradeId: originalTrade.id,
         };
         
-        // Reset block to idle
-        set({
-          blocks: blocks.map(b =>
-            b.id === blockId
-              ? { ...b, state: BlockState.IDLE, armedAt: undefined, executedAt: undefined, triggeredAt: undefined }
-              : b
-          ),
-          trades: [...trades, squareOffTrade],
-        });
+        set({ trades: [...trades, squareOffTrade] });
       }
     }
     
     get().closeConfirmDialog();
   },
   
-  // Update market snapshot
-  updateMarketSnapshot: (snapshot) => {
-    set({ marketSnapshot: { ...get().marketSnapshot, ...snapshot } });
-  },
+  // ===== GRID REGENERATION =====
   
-  // Should recalculate grid (throttled)
   shouldRecalculate: () => {
     const { currentPrice, lastRecalcPrice, lastRecalcTime, recalcThrottleMs, settings, marketSnapshot } = get();
     const now = Date.now();
     
-    // Check throttle
     if (now - lastRecalcTime < recalcThrottleMs) {
       return false;
     }
     
-    // Check if price moved more than N steps
-    const step = Math.max(settings.tickSize, (marketSnapshot.bestAsk || 0) - (marketSnapshot.bestBid || 0) || settings.tickSize);
+    const step = settings.tickSize * 5;
     const priceDelta = Math.abs(currentPrice - lastRecalcPrice);
     
     return priceDelta >= step * settings.recalcStepMultiplier;
   },
   
-  // Regenerate blocks based on current mode (with state preservation)
-  regenerateBlocks: (force = false) => {
-    const { marketSnapshot, settings, side, blocks, shouldRecalculate, currentPrice, isRegenerating, orders } = get();
+  regenerateGrid: (force = false) => {
+    const { marketSnapshot, settings, side, shouldRecalculate, currentPrice } = get();
     
-    // Prevent concurrent regeneration
-    if (isRegenerating) return;
-    
-    // Check throttle unless forced
     if (!force && !shouldRecalculate()) {
       return;
     }
     
-    set({ isRegenerating: true });
-    
     const { gridMode, levelsPerSide, tickSize, qtyThresholds } = settings;
-    
     const config = { levelsPerSide, qtyThresholds };
     const snapshotWithTick = { ...marketSnapshot, tickSize };
     
@@ -390,34 +343,19 @@ export const useTradingStore = create((set, get) => ({
       prices = generateLtpLadder(snapshotWithTick, config);
     }
     
-    // Preserve blocks that still exist (keeps IDs stable)
-    const newBlocks = generateBlocksFromPrices(prices, marketSnapshot.ltp, blocks, orders);
-    
-    // Find armed orders whose target prices no longer exist in new grid
-    const newPriceSet = new Set(prices);
-    const updatedOrders = orders.map(order => {
-      if (order.state === 'ARMED' && !newPriceSet.has(order.targetPrice)) {
-        // Cancel orders that no longer have matching blocks
-        return { ...order, state: 'CANCELLED' };
-      }
-      return order;
-    });
-    
     set({ 
-      blocks: newBlocks, 
-      orders: updatedOrders,
+      gridPrices: prices,
       lastRecalcTime: Date.now(),
       lastRecalcPrice: currentPrice,
-      isRegenerating: false,
     });
   },
   
-  // Initialize blocks
+  // ===== INITIALIZATION =====
+  
   initializeBlocks: (basePrice) => {
     const { settings, side } = get();
     const { gridMode, levelsPerSide, tickSize, qtyThresholds } = settings;
     
-    // Create initial market snapshot with simulated order book
     const spread = tickSize * 5;
     const orderBook = generateSimulatedOrderBook(basePrice, tickSize, 30);
     
@@ -440,33 +378,30 @@ export const useTradingStore = create((set, get) => ({
       prices = generateLtpLadder(snapshot, config);
     }
     
-    const blocks = generateBlocksFromPrices(prices, basePrice);
-    
     set({
       basePrice,
       currentPrice: basePrice,
       lastRecalcPrice: basePrice,
       marketSnapshot: snapshot,
-      blocks,
-      orders: [],
+      gridPrices: prices,
+      armedOrders: new Map(),
       trades: [],
       lastRecalcTime: Date.now(),
     });
   },
   
-  // Update current price (and simulate depth)
+  // ===== PRICE UPDATE =====
+  
   updatePrice: (price) => {
-    const { settings, side } = get();
+    const { settings } = get();
     const { tickSize, autoRecalc } = settings;
     
-    // Simulate spread (random 1-10 ticks)
     const spreadTicks = Math.floor(Math.random() * 10) + 1;
     const spread = spreadTicks * tickSize;
     
     const bestBid = roundToTick(price - spread / 2, tickSize);
     const bestAsk = roundToTick(price + spread / 2, tickSize);
     
-    // Regenerate simulated order book occasionally
     const shouldUpdateOrderBook = Math.random() < 0.1;
     const orderBook = shouldUpdateOrderBook 
       ? generateSimulatedOrderBook(price, tickSize, 30)
@@ -483,282 +418,200 @@ export const useTradingStore = create((set, get) => ({
       }
     });
     
-    // Check for triggers
+    // Check triggers
     get().checkTriggers(price);
     
-    // Auto-recalculate grid if enabled
+    // Auto-recalc if enabled
     if (autoRecalc) {
-      get().regenerateBlocks(false);
+      get().regenerateGrid(false);
     }
   },
   
-  // Toggle side (BUY/SELL)
-  toggleSide: () => {
-    set(state => ({
-      side: state.side === Side.BUY ? Side.SELL : Side.BUY,
-    }));
-    get().regenerateBlocks(true);
-  },
+  // ===== SIDE & QUANTITY =====
   
-  // Set side directly
   setSide: (newSide) => {
     const { side } = get();
     if (side !== newSide) {
       set({ side: newSide });
-      get().regenerateBlocks(true);
+      get().regenerateGrid(true);
     }
   },
   
-  // Set quantity
   setQuantity: (quantity) => set({ quantity: Math.max(1, quantity) }),
   
-  // Set grid mode
+  // ===== SETTINGS =====
+  
   setGridMode: (mode) => {
-    set(state => ({
-      settings: { ...state.settings, gridMode: mode }
-    }));
-    get().regenerateBlocks(true);
+    set(state => ({ settings: { ...state.settings, gridMode: mode } }));
+    get().regenerateGrid(true);
   },
   
-  // Set levels per side
   setLevelsPerSide: (levels) => {
-    set(state => ({
-      settings: { ...state.settings, levelsPerSide: levels }
-    }));
-    get().regenerateBlocks(true);
+    set(state => ({ settings: { ...state.settings, levelsPerSide: levels } }));
+    get().regenerateGrid(true);
   },
   
-  // Set tick size
   setTickSize: (tickSize) => {
     set(state => ({
       settings: { ...state.settings, tickSize },
       marketSnapshot: { ...state.marketSnapshot, tickSize }
     }));
-    get().regenerateBlocks(true);
+    get().regenerateGrid(true);
   },
   
-  // Set auto recalc
   setAutoRecalc: (autoRecalc) => {
-    set(state => ({
-      settings: { ...state.settings, autoRecalc }
-    }));
+    set(state => ({ settings: { ...state.settings, autoRecalc } }));
   },
   
-  // Handle block click with confirmation dialogs
-  handleBlockClick: (blockId) => {
-    const { blocks, side, quantity, orders, isRegenerating } = get();
+  // ===== BLOCK INTERACTION =====
+  
+  handleBlockClick: (targetPrice) => {
+    const { armedOrders, trades, side, currentPrice } = get();
     
-    // Prevent clicks during regeneration
-    if (isRegenerating) return;
+    const state = get().getBlockState(targetPrice);
     
-    const block = blocks.find(b => b.id === blockId);
-    
-    if (!block) return;
-    
-    if (block.state === BlockState.IDLE) {
-      // Arm the block
-      get().armBlock(blockId);
-    } else if (block.state === BlockState.ARMED) {
-      // Show cancel confirmation
+    if (state === BlockState.IDLE) {
+      // Arm at this price
+      get().armAtPrice(targetPrice);
+      
+    } else if (state === BlockState.ARMED) {
+      // Show cancel dialog
       get().openConfirmDialog(
         'CANCEL_ORDER',
-        blockId,
-        `Cancel this ${side} order at ${block.label}?`
+        targetPrice,
+        `Cancel this ${side} order at ₹${targetPrice.toFixed(2)}?`
       );
-    } else if (block.state === BlockState.EXECUTED) {
-      // Show square-off confirmation
-      const trade = get().trades.find(t => t.blockId === blockId && !t.isSquareOff);
+      
+    } else if (state === BlockState.EXECUTED) {
+      // Show square-off dialog
+      const trade = get().getTradeForPrice(targetPrice);
       if (trade) {
         const pnl = trade.side === Side.BUY 
-          ? (get().currentPrice - trade.execPrice) * trade.qty
-          : (trade.execPrice - get().currentPrice) * trade.qty;
+          ? (currentPrice - trade.execPrice) * trade.qty
+          : (trade.execPrice - currentPrice) * trade.qty;
         const pnlStr = pnl >= 0 ? `+₹${pnl.toFixed(2)}` : `-₹${Math.abs(pnl).toFixed(2)}`;
         
         get().openConfirmDialog(
           'SQUARE_OFF',
-          blockId,
+          targetPrice,
           `Square off this trade? Current P&L: ${pnlStr}`
         );
       }
-    } else if (block.state === BlockState.CANCELLED) {
-      // Reset to idle
-      get().resetBlock(blockId);
     }
   },
   
-  // Arm a block (create order intent)
-  armBlock: (blockId) => {
-    const { blocks, side, quantity, orders } = get();
-    const block = blocks.find(b => b.id === blockId);
+  // Arm at a specific price (independent of grid)
+  armAtPrice: (targetPrice) => {
+    const { armedOrders, side, quantity } = get();
     
-    if (!block || block.state !== BlockState.IDLE) return;
+    // Don't arm if already armed
+    if (armedOrders.has(targetPrice)) return;
     
-    const now = Date.now();
-    
-    set({
-      blocks: blocks.map(b =>
-        b.id === blockId
-          ? { ...b, state: BlockState.ARMED, armedAt: now }
-          : b
-      ),
-      orders: [
-        ...orders,
-        {
-          id: generateId(),
-          blockId,
-          side,
-          qty: quantity,
-          targetPrice: block.targetPrice,
-          state: 'ARMED',
-          armedAt: now,
-        },
-      ],
+    const newArmed = new Map(armedOrders);
+    newArmed.set(targetPrice, {
+      id: generateId(),
+      targetPrice,
+      side,
+      qty: quantity,
+      state: 'ARMED',
+      armedAt: Date.now(),
     });
+    
+    set({ armedOrders: newArmed });
   },
   
-  // Cancel an armed block
-  cancelBlock: (blockId) => {
-    const { blocks, orders } = get();
-    
-    set({
-      blocks: blocks.map(b =>
-        b.id === blockId && b.state === BlockState.ARMED
-          ? { ...b, state: BlockState.IDLE, armedAt: undefined }
-          : b
-      ),
-      orders: orders.map(o =>
-        o.blockId === blockId && o.state === 'ARMED'
-          ? { ...o, state: 'CANCELLED' }
-          : o
-      ),
-    });
+  // Cancel armed order at price
+  cancelAtPrice: (targetPrice) => {
+    const { armedOrders } = get();
+    const newArmed = new Map(armedOrders);
+    newArmed.delete(targetPrice);
+    set({ armedOrders: newArmed });
   },
   
-  // Check if any armed blocks should trigger
+  // ===== TRIGGER CHECKING =====
+  
   checkTriggers: (currentPrice) => {
-    const { blocks, orders, trades } = get();
+    const { armedOrders, trades } = get();
     const now = Date.now();
     
-    const armedOrders = orders.filter(o => o.state === 'ARMED');
-    const updatedBlocks = [...blocks];
-    const updatedOrders = [...orders];
+    const newArmed = new Map(armedOrders);
     const newTrades = [];
     
-    armedOrders.forEach(order => {
-      const block = blocks.find(b => b.id === order.blockId);
-      if (!block) return;
-      
-      // Trigger condition: price crosses target
+    armedOrders.forEach((order, targetPrice) => {
+      // Trigger condition
       const shouldTrigger = order.side === Side.BUY
-        ? currentPrice <= order.targetPrice
-        : currentPrice >= order.targetPrice;
+        ? currentPrice <= targetPrice
+        : currentPrice >= targetPrice;
       
       if (shouldTrigger) {
-        const blockIndex = updatedBlocks.findIndex(b => b.id === order.blockId);
-        if (blockIndex !== -1) {
-          updatedBlocks[blockIndex] = {
-            ...updatedBlocks[blockIndex],
-            state: BlockState.EXECUTED,
-            triggeredAt: now,
-            executedAt: now,
-          };
-        }
+        // Remove from armed
+        newArmed.delete(targetPrice);
         
-        const orderIndex = updatedOrders.findIndex(o => o.id === order.id);
-        if (orderIndex !== -1) {
-          updatedOrders[orderIndex] = {
-            ...updatedOrders[orderIndex],
-            state: 'EXECUTED',
-            triggeredAt: now,
-            executedAt: now,
-            execPrice: currentPrice,
-          };
-        }
-        
+        // Create trade
         newTrades.push({
           id: generateId(),
           ts: now,
           side: order.side,
           qty: order.qty,
-          triggerPrice: order.targetPrice,
+          targetPrice: order.targetPrice,
           execPrice: currentPrice,
-          blockId: order.blockId,
         });
       }
     });
     
     if (newTrades.length > 0) {
       set({
-        blocks: updatedBlocks,
-        orders: updatedOrders,
+        armedOrders: newArmed,
         trades: [...trades, ...newTrades],
       });
     }
   },
   
-  // Reset a single block to idle
-  resetBlock: (blockId) => {
-    const { blocks } = get();
-    set({
-      blocks: blocks.map(b =>
-        b.id === blockId
-          ? { ...b, state: BlockState.IDLE, armedAt: undefined, triggeredAt: undefined, executedAt: undefined }
-          : b
-      ),
-    });
+  // ===== RESET =====
+  
+  resetAll: () => {
+    set({ armedOrders: new Map(), trades: [] });
+    get().regenerateGrid(true);
   },
   
-  // Reset all blocks
-  resetAllBlocks: () => {
-    set({ orders: [], trades: [] });
-    get().regenerateBlocks(true);
+  // ===== COMPUTED VALUES =====
+  
+  getArmedCount: () => get().armedOrders.size,
+  
+  getExecutedCount: () => {
+    const { trades } = get();
+    const openTrades = trades.filter(t => !t.isSquareOff);
+    const closedIds = new Set(trades.filter(t => t.isSquareOff).map(t => t.originalTradeId));
+    return openTrades.filter(t => !closedIds.has(t.id)).length;
   },
   
-  // Update settings
-  updateSettings: (newSettings) => {
-    set(state => ({
-      settings: { ...state.settings, ...newSettings },
-    }));
-  },
-  
-  // Get armed orders count
-  getArmedCount: () => {
-    return get().orders.filter(o => o.state === 'ARMED').length;
-  },
-  
-  // Get total P&L
   getTotalPnL: () => {
     const { trades, currentPrice } = get();
     let pnl = 0;
     
-    // Group trades by blockId to handle square-offs
-    const tradesByBlock = {};
-    trades.forEach(trade => {
-      if (!tradesByBlock[trade.blockId]) {
-        tradesByBlock[trade.blockId] = [];
+    const tradeMap = new Map();
+    trades.forEach(t => {
+      if (!t.isSquareOff) {
+        tradeMap.set(t.id, { open: t, close: null });
       }
-      tradesByBlock[trade.blockId].push(trade);
+    });
+    trades.forEach(t => {
+      if (t.isSquareOff && tradeMap.has(t.originalTradeId)) {
+        tradeMap.get(t.originalTradeId).close = t;
+      }
     });
     
-    // Calculate P&L for each position
-    Object.values(tradesByBlock).forEach(blockTrades => {
-      const openTrade = blockTrades.find(t => !t.isSquareOff);
-      const closeTrade = blockTrades.find(t => t.isSquareOff);
-      
-      if (openTrade && closeTrade) {
-        // Closed position - realized P&L
-        if (openTrade.side === Side.BUY) {
-          pnl += (closeTrade.execPrice - openTrade.execPrice) * openTrade.qty;
-        } else {
-          pnl += (openTrade.execPrice - closeTrade.execPrice) * openTrade.qty;
-        }
-      } else if (openTrade) {
-        // Open position - unrealized P&L
-        if (openTrade.side === Side.BUY) {
-          pnl += (currentPrice - openTrade.execPrice) * openTrade.qty;
-        } else {
-          pnl += (openTrade.execPrice - currentPrice) * openTrade.qty;
-        }
+    tradeMap.forEach(({ open, close }) => {
+      if (close) {
+        // Realized P&L
+        pnl += open.side === Side.BUY
+          ? (close.execPrice - open.execPrice) * open.qty
+          : (open.execPrice - close.execPrice) * open.qty;
+      } else {
+        // Unrealized P&L
+        pnl += open.side === Side.BUY
+          ? (currentPrice - open.execPrice) * open.qty
+          : (open.execPrice - currentPrice) * open.qty;
       }
     });
     
