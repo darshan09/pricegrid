@@ -362,12 +362,17 @@ export const useTradingStore = create((set, get) => ({
   
   // Regenerate blocks based on current mode (with state preservation)
   regenerateBlocks: (force = false) => {
-    const { marketSnapshot, settings, side, blocks, shouldRecalculate, currentPrice } = get();
+    const { marketSnapshot, settings, side, blocks, shouldRecalculate, currentPrice, isRegenerating } = get();
+    
+    // Prevent concurrent regeneration
+    if (isRegenerating) return;
     
     // Check throttle unless forced
     if (!force && !shouldRecalculate()) {
       return;
     }
+    
+    set({ isRegenerating: true });
     
     const { gridMode, levelsPerSide, tickSize, qtyThresholds } = settings;
     
