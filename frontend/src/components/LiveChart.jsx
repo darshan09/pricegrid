@@ -5,6 +5,7 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
   const blocks = useTradingStore(state => state.blocks);
+  const marketSnapshot = useTradingStore(state => state.marketSnapshot);
   
   // Get armed block prices for markers
   const armedPrices = blocks
@@ -33,7 +34,11 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     
     // Calculate price range
     const prices = priceHistory.map(p => p.price);
+    const { bestBid, bestAsk } = marketSnapshot;
     const allPrices = [...prices, ...armedPrices, currentPrice];
+    if (bestBid) allPrices.push(bestBid);
+    if (bestAsk) allPrices.push(bestAsk);
+    
     const minPrice = Math.min(...allPrices) - 3;
     const maxPrice = Math.max(...allPrices) + 3;
     const priceRange = maxPrice - minPrice || 1;
@@ -69,7 +74,45 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       ctx.stroke();
     }
     
-    // Draw armed price markers (horizontal dashed lines)
+    // Draw best bid line (green, dashed)
+    if (bestBid) {
+      const y = padding.top + chartHeight * (1 - (bestBid - minPrice) / priceRange);
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(w - padding.right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Label
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.7)';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`BID`, w - padding.right - 5, y - 3);
+    }
+    
+    // Draw best ask line (red, dashed)
+    if (bestAsk) {
+      const y = padding.top + chartHeight * (1 - (bestAsk - minPrice) / priceRange);
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(w - padding.right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Label
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`ASK`, w - padding.right - 5, y - 3);
+    }
+    
+    // Draw armed price markers (horizontal dashed lines - lime)
     armedPrices.forEach(targetPrice => {
       const y = padding.top + chartHeight * (1 - (targetPrice - minPrice) / priceRange);
       
@@ -152,7 +195,7 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     }
     
     ctx.restore();
-  }, [priceHistory, currentPrice, armedPrices, width, height]);
+  }, [priceHistory, currentPrice, armedPrices, marketSnapshot, width, height]);
 
   // Set up canvas and animation loop
   useEffect(() => {
