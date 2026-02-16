@@ -3,11 +3,12 @@ import PriceBlock from './PriceBlock';
 import { useTradingStore } from '../store/tradingStore';
 
 const PriceGrid = ({ currentPrice }) => {
-  const blocks = useTradingStore(state => state.blocks);
+  const gridPrices = useTradingStore(state => state.gridPrices);
   const settings = useTradingStore(state => state.settings);
+  const side = useTradingStore(state => state.side);
   
   // Calculate optimal columns based on block count
-  const blockCount = blocks.length;
+  const blockCount = gridPrices.length;
   let cols;
   if (blockCount <= 9) {
     cols = 3;
@@ -31,10 +32,10 @@ const PriceGrid = ({ currentPrice }) => {
       }}
       data-testid="price-grid"
     >
-      {blocks.map(block => (
+      {gridPrices.map(targetPrice => (
         <PriceBlock 
-          key={block.id} 
-          block={block} 
+          key={`block-${settings.gridMode}-${side}-${targetPrice.toFixed(2)}`}
+          targetPrice={targetPrice}
           currentPrice={currentPrice}
         />
       ))}
