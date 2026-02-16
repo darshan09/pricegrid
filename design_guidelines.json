@@ -1,0 +1,138 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "Neon Trader E1",
+      "tone": "High-Frequency, Cyberpunk, Precision, Aggressive",
+      "aesthetic": "Dark Void with Neon Accents",
+      "archetype": "Electric & Neon"
+    },
+    "typography": {
+      "font_family": {
+        "headings": "Manrope, sans-serif",
+        "body": "Manrope, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "scaling": {
+        "h1": "text-4xl md:text-5xl font-bold tracking-tight",
+        "h2": "text-3xl font-semibold tracking-tight",
+        "h3": "text-xl font-medium",
+        "body": "text-sm md:text-base leading-relaxed",
+        "label": "text-xs font-mono uppercase tracking-widest text-muted-foreground",
+        "price_large": "text-6xl font-mono font-bold tracking-tighter"
+      }
+    },
+    "colors": {
+      "palette": {
+        "background": {
+          "default": "#050505",
+          "card": "#0A0A0A",
+          "overlay": "rgba(5, 5, 5, 0.8)"
+        },
+        "foreground": {
+          "default": "#FFFFFF",
+          "muted": "#A1A1AA"
+        },
+        "primary": {
+          "default": "#F555A2",
+          "foreground": "#FFFFFF",
+          "glow": "0 0 20px rgba(245, 85, 162, 0.5)"
+        },
+        "accent": {
+          "default": "#E0FF66",
+          "foreground": "#000000",
+          "glow": "0 0 15px rgba(224, 255, 102, 0.6)"
+        },
+        "chart": {
+          "line": "#F555A2",
+          "grid": "#2A1C2B",
+          "crosshair": "#E0FF66"
+        },
+        "states": {
+          "success": "#E0FF66",
+          "warning": "#FFD600",
+          "error": "#FF3B30",
+          "idle": "#1F1F1F"
+        }
+      },
+      "gradients": {
+        "none": "Solid colors only. No background gradients."
+      }
+    },
+    "spacing": {
+      "container_padding": "p-4 md:p-6",
+      "grid_gap": "gap-4",
+      "section_gap": "gap-8"
+    },
+    "layout": {
+      "structure": "Single Page Dashboard. Header top, Chart bottom-left, Grid center-right, Sidebar hidden/overlay.",
+      "grid_system": "CSS Grid for Price Blocks. Flexbox for Header/Toolbar.",
+      "chart_aspect_ratio": "w-full h-[300px] md:h-[400px]"
+    },
+    "components": {
+      "PriceBlock": {
+        "base": "aspect-square rounded-md border border-white/10 flex flex-col items-center justify-center transition-all duration-100 cursor-pointer select-none",
+        "idle": "bg-card hover:bg-white/5",
+        "armed": "border-accent/80 bg-accent/10 shadow-[0_0_15px_rgba(224,255,102,0.3)] animate-pulse",
+        "executed": "bg-accent text-accent-foreground shadow-[0_0_20px_rgba(224,255,102,0.8)] scale-105 z-10",
+        "text_price": "text-lg font-mono font-bold",
+        "text_multiplier": "text-xs font-mono opacity-70"
+      },
+      "Button": {
+        "base": "px-6 py-2 rounded-full font-bold uppercase tracking-wider text-xs transition-all",
+        "primary": "bg-primary text-white hover:bg-primary/90 shadow-[0_0_10px_rgba(245,85,162,0.4)]",
+        "outline": "border border-white/20 hover:bg-white/10 text-white"
+      }
+    },
+    "motion": {
+      "durations": {
+        "fast": "100ms",
+        "normal": "200ms",
+        "slow": "500ms"
+      },
+      "easings": {
+        "default": "ease-out",
+        "bouncy": "cubic-bezier(0.34, 1.56, 0.64, 1)"
+      }
+    }
+  },
+  "implementation_plan": {
+    "phases": [
+      "Setup Global Styles (Fonts, Colors)",
+      "Build Layout Shell (Header, Main, Sidebar)",
+      "Implement Simulation Engine (Price Feed Hook)",
+      "Build Live Chart Component (Canvas)",
+      "Build Price Grid Component",
+      "Implement Tap-to-Trade Logic",
+      "Final Polish (Animations, Glows)"
+    ],
+    "files": {
+      "tailwind_config": "/app/frontend/tailwind.config.js",
+      "global_css": "/app/frontend/src/index.css",
+      "main_component": "/app/frontend/src/App.js",
+      "components_dir": "/app/frontend/src/components"
+    }
+  },
+  "image_urls": {
+    "logo": "No logo required, use text 'NEON TRADER'",
+    "icons": "Use lucide-react icons"
+  },
+  "instructions_to_main_agent": [
+    "1. INSTALL DEPENDENCIES: `npm install lucide-react clsx tailwind-merge framer-motion` (or yarn)",
+    "2. SETUP FONTS: Add Google Fonts imports for 'Manrope' and 'JetBrains Mono' to index.css",
+    "3. SIMULATION ENGINE: Create a custom hook `useMarketSimulation` that returns `{ currentPrice, priceHistory }`. Use a random walk algorithm with occasional jumps.",
+    "4. CANVAS CHART: Do NOT use a charting library (recharts/chartjs) for the main price line. Use a raw HTML5 `<canvas>` for maximum performance (60fps) and the specific 'glowing line' look.",
+    "5. PRICE GRID: Generate a grid of ~12-16 blocks. Each block represents a price target relative to the start price (e.g., +10, +20, -10).",
+    "6. STATE MANAGEMENT: Use a simple state object for orders: `{ id, price, status: 'IDLE' | 'ARMED' | 'EXECUTED' }`.",
+    "7. INTERACTION: Clicking a block sets it to 'ARMED'. If `currentPrice` crosses `block.price`, change to 'EXECUTED' immediately.",
+    "8. THEME: Force Dark Mode. Do not implement a light mode toggle."
+  ],
+  "universal_guidelines": [
+    "No Gradients on Backgrounds.",
+    "Use 'JetBrains Mono' for ALL numbers.",
+    "Pink (#F555A2) is the Brand Color.",
+    "Lime (#E0FF66) is the Action/Success Color.",
+    "Animations must be snappy (100-200ms).",
+    "Chart line must have a shadow/glow.",
+    "Use `data-testid` for all interactive elements."
+  ]
+}
