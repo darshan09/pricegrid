@@ -1,16 +1,14 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { useTradingStore, BlockState } from '../store/tradingStore';
+import { useTradingStore } from '../store/tradingStore';
 
 const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) => {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
-  const blocks = useTradingStore(state => state.blocks);
+  const armedOrders = useTradingStore(state => state.armedOrders);
   const marketSnapshot = useTradingStore(state => state.marketSnapshot);
   
-  // Get armed block prices for markers
-  const armedPrices = blocks
-    .filter(b => b.state === BlockState.ARMED)
-    .map(b => b.targetPrice);
+  // Get armed prices from Map
+  const armedPrices = Array.from(armedOrders.keys());
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -19,10 +17,7 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Scale for retina displays
     ctx.save();
     ctx.scale(dpr, dpr);
     
@@ -32,7 +27,6 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     const chartWidth = w - padding.left - padding.right;
     const chartHeight = h - padding.top - padding.bottom;
     
-    // Calculate price range
     const prices = priceHistory.map(p => p.price);
     const { bestBid, bestAsk } = marketSnapshot;
     const allPrices = [...prices, ...armedPrices, currentPrice];
@@ -43,11 +37,10 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     const maxPrice = Math.max(...allPrices) + 3;
     const priceRange = maxPrice - minPrice || 1;
     
-    // Draw grid
+    // Grid
     ctx.strokeStyle = '#2A1C2B';
     ctx.lineWidth = 1;
     
-    // Horizontal grid lines (price levels)
     const gridLines = 4;
     for (let i = 0; i <= gridLines; i++) {
       const y = padding.top + (chartHeight * i) / gridLines;
@@ -56,7 +49,6 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       ctx.lineTo(w - padding.right, y);
       ctx.stroke();
       
-      // Price labels
       const price = maxPrice - (priceRange * i) / gridLines;
       ctx.fillStyle = '#F555A2';
       ctx.font = '9px "JetBrains Mono", monospace';
@@ -64,7 +56,6 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       ctx.fillText(`₹${price.toFixed(0)}`, w - padding.right + 5, y + 3);
     }
     
-    // Vertical grid lines
     const vLines = 6;
     for (let i = 0; i <= vLines; i++) {
       const x = padding.left + (chartWidth * i) / vLines;
@@ -74,7 +65,7 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       ctx.stroke();
     }
     
-    // Draw best bid line (green, dashed)
+    // Bid line
     if (bestBid) {
       const y = padding.top + chartHeight * (1 - (bestBid - minPrice) / priceRange);
       ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
@@ -86,14 +77,13 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       ctx.stroke();
       ctx.setLineDash([]);
       
-      // Label
       ctx.fillStyle = 'rgba(34, 197, 94, 0.7)';
       ctx.font = '8px "JetBrains Mono", monospace';
       ctx.textAlign = 'right';
       ctx.fillText(`BID`, w - padding.right - 5, y - 3);
     }
     
-    // Draw best ask line (red, dashed)
+    // Ask line
     if (bestAsk) {
       const y = padding.top + chartHeight * (1 - (bestAsk - minPrice) / priceRange);
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
@@ -105,14 +95,13 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       ctx.stroke();
       ctx.setLineDash([]);
       
-      // Label
       ctx.fillStyle = 'rgba(239, 68, 68, 0.7)';
       ctx.font = '8px "JetBrains Mono", monospace';
       ctx.textAlign = 'right';
       ctx.fillText(`ASK`, w - padding.right - 5, y - 3);
     }
     
-    // Draw armed price markers (horizontal dashed lines - lime)
+    // Armed price markers
     armedPrices.forEach(targetPrice => {
       const y = padding.top + chartHeight * (1 - (targetPrice - minPrice) / priceRange);
       
@@ -125,21 +114,20 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       ctx.stroke();
       ctx.setLineDash([]);
       
-      // Label with glow
       ctx.fillStyle = '#E0FF66';
       ctx.font = 'bold 8px "JetBrains Mono", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`TARGET ₹${targetPrice}`, padding.left + 5, y - 4);
+      ctx.fillText(`TARGET ₹${targetPrice.toFixed(2)}`, padding.left + 5, y - 4);
     });
     
-    // Draw price line
+    // Price line
     if (priceHistory.length > 1) {
       const points = priceHistory.map((point, i) => ({
         x: padding.left + (chartWidth * i) / (priceHistory.length - 1),
         y: padding.top + chartHeight * (1 - (point.price - minPrice) / priceRange),
       }));
       
-      // Glow effect - multiple strokes with decreasing opacity
+      // Glow
       const glowLayers = [
         { color: 'rgba(245, 85, 162, 0.05)', width: 12 },
         { color: 'rgba(245, 85, 162, 0.1)', width: 8 },
@@ -170,10 +158,9 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       }
       ctx.stroke();
       
-      // Current price dot with glow
+      // Current price dot
       const lastPoint = points[points.length - 1];
       
-      // Outer glow rings
       [12, 8, 5].forEach((radius, i) => {
         ctx.beginPath();
         ctx.arc(lastPoint.x, lastPoint.y, radius, 0, Math.PI * 2);
@@ -181,13 +168,11 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
         ctx.fill();
       });
       
-      // Inner dot
       ctx.beginPath();
       ctx.arc(lastPoint.x, lastPoint.y, 3, 0, Math.PI * 2);
       ctx.fillStyle = '#F555A2';
       ctx.fill();
       
-      // White center
       ctx.beginPath();
       ctx.arc(lastPoint.x, lastPoint.y, 1.5, 0, Math.PI * 2);
       ctx.fillStyle = '#FFFFFF';
@@ -197,7 +182,6 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     ctx.restore();
   }, [priceHistory, currentPrice, armedPrices, marketSnapshot, width, height]);
 
-  // Set up canvas and animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
