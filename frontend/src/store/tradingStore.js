@@ -545,7 +545,11 @@ export const useTradingStore = create((set, get) => ({
   
   // Handle block click with confirmation dialogs
   handleBlockClick: (blockId) => {
-    const { blocks, side, quantity, orders } = get();
+    const { blocks, side, quantity, orders, isRegenerating } = get();
+    
+    // Prevent clicks during regeneration
+    if (isRegenerating) return;
+    
     const block = blocks.find(b => b.id === blockId);
     
     if (!block) return;
