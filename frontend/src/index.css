@@ -7,9 +7,10 @@
 :root {
   --neon-lime: #E0FF66;
   --neon-pink: #F555A2;
-  --dark-void: #050505;
-  --dark-card: #0A0A0A;
+  --dark-void: #0A0510;
+  --dark-card: #120A14;
   --grid-color: #2A1C2B;
+  --grid-border: #3D2840;
 }
 
 * {
@@ -33,24 +34,24 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 2%;
+    --background: 320 50% 3%;
     --foreground: 0 0% 100%;
-    --card: 0 0% 4%;
+    --card: 320 40% 5%;
     --card-foreground: 0 0% 100%;
-    --popover: 0 0% 4%;
+    --popover: 320 40% 5%;
     --popover-foreground: 0 0% 100%;
     --primary: 334 90% 65%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 10%;
+    --secondary: 320 30% 12%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 64%;
+    --muted: 320 20% 18%;
+    --muted-foreground: 334 40% 70%;
     --accent: 69 100% 70%;
     --accent-foreground: 0 0% 0%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
+    --border: 320 40% 20%;
+    --input: 320 30% 15%;
     --ring: 334 90% 65%;
     --radius: 0.5rem;
   }
