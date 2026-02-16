@@ -258,8 +258,8 @@ export const useTradingStore = create((set, get) => ({
     levelsPerSide: 12,
     tickSize: 0.05,
     qtyThresholds: [1, 5, 10, 25, 50, 100, 250, 500],
-    autoRecalc: true,
-    recalcStepMultiplier: 1, // Recalc when LTP moves more than N steps
+    autoRecalc: false, // Disabled by default - user can enable if needed
+    recalcStepMultiplier: 5, // Only recalc when price moves 5+ steps
   },
   
   // Open confirmation dialog
