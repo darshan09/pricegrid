@@ -1,16 +1,27 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { BlockState, useTradingStore } from '../store/tradingStore';
-import { X } from 'lucide-react';
+import { BlockState, useTradingStore, Side } from '../store/tradingStore';
+import { X, TrendingUp, TrendingDown } from 'lucide-react';
 
 const PriceBlock = ({ block, currentPrice }) => {
-  const { armBlock, cancelBlock, resetBlock } = useTradingStore();
+  const { handleBlockClick, cancelBlock, side, trades } = useTradingStore();
   
   const { id, label, targetPrice, state } = block;
   
-  // Determine if price is above or below target
-  const priceAbove = currentPrice > targetPrice;
-  const priceDiff = Math.abs(currentPrice - targetPrice).toFixed(2);
+  // Calculate delta and percentage
+  const delta = targetPrice - currentPrice;
+  const deltaAbs = Math.abs(delta);
+  const percentChange = ((targetPrice - currentPrice) / currentPrice) * 100;
+  const isPositive = delta >= 0;
+  
+  // For executed blocks, show the trade P&L
+  const trade = trades.find(t => t.blockId === id && !t.isSquareOff);
+  let tradePnL = null;
+  if (trade && state === BlockState.EXECUTED) {
+    tradePnL = trade.side === Side.BUY 
+      ? (currentPrice - trade.execPrice) * trade.qty
+      : (trade.execPrice - currentPrice) * trade.qty;
+  }
   
   // State-based styles
   const getStateStyles = () => {
@@ -20,20 +31,18 @@ const PriceBlock = ({ block, currentPrice }) => {
       case BlockState.TRIGGERED:
         return 'border-[#E0FF66] bg-[#E0FF66]/60 shadow-[0_0_30px_rgba(224,255,102,0.7)]';
       case BlockState.EXECUTED:
-        return 'border-[#E0FF66] bg-[#E0FF66] text-black shadow-[0_0_30px_rgba(224,255,102,0.8)] scale-105 z-10';
+        return tradePnL !== null && tradePnL >= 0
+          ? 'border-green-400 bg-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.5)]'
+          : 'border-red-400 bg-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.5)]';
       case BlockState.CANCELLED:
-        return 'border-red-500/50 bg-red-500/10 opacity-50';
+        return 'border-red-500/30 bg-red-500/5 opacity-40';
       default:
         return 'border-[#3D2840] bg-[#120A14] hover:bg-[#1A0F1C] hover:border-[#F555A2]/40';
     }
   };
   
   const handleClick = () => {
-    if (state === BlockState.IDLE) {
-      armBlock(id);
-    } else if (state === BlockState.EXECUTED || state === BlockState.CANCELLED) {
-      resetBlock(id);
-    }
+    handleBlockClick(id);
   };
   
   const handleCancel = (e) => {
@@ -48,7 +57,7 @@ const PriceBlock = ({ block, currentPrice }) => {
     <motion.div
       className={`
         relative aspect-square rounded-md border-2 flex flex-col items-center justify-center 
-        cursor-pointer select-none transition-colors duration-150
+        cursor-pointer select-none transition-colors duration-150 p-1
         ${getStateStyles()}
       `}
       onClick={handleClick}
@@ -79,32 +88,50 @@ const PriceBlock = ({ block, currentPrice }) => {
       )}
       
       {/* Main price label */}
-      <span className={`text-base md:text-lg font-mono font-bold tracking-tight ${isExecuted ? 'text-black' : 'text-white'}`}>
+      <span className={`text-sm md:text-base font-mono font-bold tracking-tight ${
+        isExecuted ? (tradePnL >= 0 ? 'text-green-400' : 'text-red-400') : 'text-white'
+      }`}>
         {label}
       </span>
       
-      {/* Distance indicator */}
-      <span className={`text-[10px] md:text-xs font-mono mt-0.5 ${
+      {/* Delta display */}
+      <div className={`flex items-center gap-0.5 text-[9px] md:text-[10px] font-mono mt-0.5 ${
         isExecuted 
-          ? 'text-black/70' 
-          : priceAbove ? 'text-[#F555A2]' : 'text-[#E0FF66]'
+          ? (tradePnL >= 0 ? 'text-green-400/80' : 'text-red-400/80')
+          : isPositive ? 'text-[#E0FF66]' : 'text-[#F555A2]'
       }`}>
-        {priceAbove ? '↓' : '↑'} ₹{priceDiff}
+        {isPositive ? (
+          <TrendingUp size={10} />
+        ) : (
+          <TrendingDown size={10} />
+        )}
+        <span>₹{deltaAbs.toFixed(2)}</span>
+      </div>
+      
+      {/* Percentage change */}
+      <span className={`text-[8px] font-mono ${
+        isExecuted 
+          ? (tradePnL >= 0 ? 'text-green-400/60' : 'text-red-400/60')
+          : isPositive ? 'text-[#E0FF66]/60' : 'text-[#F555A2]/60'
+      }`}>
+        {isPositive ? '+' : ''}{percentChange.toFixed(2)}%
       </span>
       
       {/* State indicator */}
       {isArmed && (
         <motion.span 
-          className="absolute bottom-1 text-[8px] md:text-[9px] font-mono uppercase tracking-widest text-[#E0FF66]"
+          className="absolute bottom-0.5 text-[7px] md:text-[8px] font-mono uppercase tracking-widest text-[#E0FF66]"
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.5, repeat: Infinity }}
         >
           ARMED
         </motion.span>
       )}
-      {isExecuted && (
-        <span className="absolute bottom-1 text-[8px] md:text-[9px] font-mono uppercase tracking-widest text-black/80">
-          EXECUTED
+      {isExecuted && tradePnL !== null && (
+        <span className={`absolute bottom-0.5 text-[7px] md:text-[8px] font-mono font-bold ${
+          tradePnL >= 0 ? 'text-green-400' : 'text-red-400'
+        }`}>
+          {tradePnL >= 0 ? '+' : ''}₹{tradePnL.toFixed(2)}
         </span>
       )}
     </motion.div>
