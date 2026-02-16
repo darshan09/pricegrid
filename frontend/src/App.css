@@ -1,34 +1,153 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Neon Trader - Custom Styles */
+
+/* Base app styles */
+.App {
+  min-height: 100vh;
+  background-color: #050505;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Price display glow */
+.price-glow {
+  text-shadow: 0 0 10px rgba(245, 85, 162, 0.8);
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Block grid responsive adjustments */
+@media (max-width: 640px) {
+  .price-block {
+    font-size: 12px;
+  }
 }
 
-.App-link {
-    color: #61dafb;
+/* Canvas chart container */
+.chart-container {
+  position: relative;
+  background: #050505;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Scrollbar for trade log */
+.trade-log-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2A1C2B #050505;
+}
+
+/* Button hover effects */
+.neon-button {
+  transition: all 0.2s ease-out;
+}
+
+.neon-button:hover {
+  box-shadow: 0 0 15px rgba(245, 85, 162, 0.5);
+}
+
+/* Armed block pulse animation */
+@keyframes armed-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(224, 255, 102, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(224, 255, 102, 0.6);
+    transform: scale(1.02);
+  }
+}
+
+.block-armed {
+  animation: armed-pulse 1s ease-in-out infinite;
+}
+
+/* Executed block flash */
+@keyframes executed-flash {
+  0% {
+    background-color: rgba(224, 255, 102, 0.5);
+  }
+  100% {
+    background-color: #E0FF66;
+  }
+}
+
+.block-executed {
+  animation: executed-flash 0.3s ease-out forwards;
+}
+
+/* Side toggle button active states */
+.side-buy-active {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+.side-sell-active {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+/* Quantity control */
+.qty-button {
+  transition: all 0.1s ease;
+}
+
+.qty-button:active {
+  transform: scale(0.95);
+}
+
+/* Trade log entry animation */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.trade-entry {
+  animation: slide-in 0.2s ease-out;
+}
+
+/* Loading state for price */
+@keyframes price-loading {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.price-loading {
+  animation: price-loading 1s ease-in-out infinite;
+}
+
+/* Grid overlay pattern */
+.grid-pattern {
+  background-image: 
+    linear-gradient(rgba(42, 28, 43, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 28, 43, 0.3) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* Responsive text sizes */
+@media (max-width: 768px) {
+  .price-large {
+    font-size: 2rem;
+  }
+  
+  .block-label {
+    font-size: 0.875rem;
+  }
+}
+
+/* Focus states */
+button:focus-visible {
+  outline: 2px solid #F555A2;
+  outline-offset: 2px;
+}
+
+/* Disable text selection on interactive elements */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
 }
