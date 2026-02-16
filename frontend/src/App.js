@@ -6,6 +6,7 @@ import LiveChart from './components/LiveChart';
 import PriceGrid from './components/PriceGrid';
 import TradeLog from './components/TradeLog';
 import ControlPanel from './components/ControlPanel';
+import ConfirmDialog from './components/ConfirmDialog';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 
@@ -45,10 +46,27 @@ function App() {
   useEffect(() => {
     if (trades.length > lastTradeCount) {
       const newTrade = trades[trades.length - 1];
-      toast.success(`${newTrade.side} Order Executed!`, {
-        description: `${newTrade.qty} @ ₹${newTrade.execPrice.toFixed(2)}`,
-        duration: 3000,
-      });
+      
+      if (newTrade.isSquareOff) {
+        // Square-off trade
+        const originalTrade = trades.find(t => t.id === newTrade.originalTradeId);
+        const pnl = originalTrade
+          ? (originalTrade.side === 'BUY' 
+              ? (newTrade.execPrice - originalTrade.execPrice) * originalTrade.qty
+              : (originalTrade.execPrice - newTrade.execPrice) * originalTrade.qty)
+          : 0;
+        
+        toast.success(`Position Squared Off!`, {
+          description: `P&L: ${pnl >= 0 ? '+' : ''}₹${pnl.toFixed(2)}`,
+          duration: 4000,
+        });
+      } else {
+        // New trade execution
+        toast.success(`${newTrade.side} Order Executed!`, {
+          description: `${newTrade.qty} @ ₹${newTrade.execPrice.toFixed(2)}`,
+          duration: 3000,
+        });
+      }
       setLastTradeCount(trades.length);
     }
   }, [trades, lastTradeCount]);
@@ -59,13 +77,12 @@ function App() {
       const container = document.getElementById('chart-container');
       if (container) {
         setChartDimensions({
-          width: container.offsetWidth - 32, // Account for padding
+          width: container.offsetWidth - 32,
           height: Math.min(200, Math.max(150, window.innerHeight * 0.2)),
         });
       }
     };
     
-    // Initial call after a small delay to ensure container is rendered
     const timeoutId = setTimeout(handleResize, 100);
     window.addEventListener('resize', handleResize);
     return () => {
@@ -124,6 +141,9 @@ function App() {
           <TradeLog />
         </div>
       </div>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog />
       
       {/* Toast notifications */}
       <Toaster 
