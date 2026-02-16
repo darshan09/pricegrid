@@ -149,33 +149,37 @@ function generateLiquidityLadder(snapshot, config, side) {
 }
 
 // Generate price blocks from prices array
-const generateBlocksFromPrices = (prices, currentLtp, existingBlocks = []) => {
-  // Create a map of existing armed/executed blocks by target price
-  const existingStates = new Map();
+const generateBlocksFromPrices = (prices, currentLtp, existingBlocks = [], existingOrders = []) => {
+  // Create a map of existing blocks by target price (to preserve IDs and states)
+  const existingByPrice = new Map();
   existingBlocks.forEach(block => {
-    if (block.state === BlockState.ARMED || block.state === BlockState.EXECUTED) {
-      existingStates.set(block.targetPrice, {
-        state: block.state,
-        armedAt: block.armedAt,
-        executedAt: block.executedAt,
-        triggeredAt: block.triggeredAt,
-      });
+    existingByPrice.set(block.targetPrice, block);
+  });
+  
+  // Create a map of armed orders by target price
+  const armedOrdersByPrice = new Map();
+  existingOrders.forEach(order => {
+    if (order.state === 'ARMED') {
+      armedOrdersByPrice.set(order.targetPrice, order);
     }
   });
   
   return prices.map(targetPrice => {
-    // Check if this price level had a preserved state
-    const preserved = existingStates.get(targetPrice);
+    // Check if this price level already has a block
+    const existingBlock = existingByPrice.get(targetPrice);
     
+    if (existingBlock) {
+      // Keep the same block (preserves ID and state)
+      return existingBlock;
+    }
+    
+    // Create new block for new price level
     return {
       id: generateId(),
       label: `₹${targetPrice.toLocaleString('en-IN')}`,
       targetPrice,
-      state: preserved ? preserved.state : BlockState.IDLE,
+      state: BlockState.IDLE,
       createdAt: Date.now(),
-      armedAt: preserved?.armedAt,
-      executedAt: preserved?.executedAt,
-      triggeredAt: preserved?.triggeredAt,
     };
   });
 };
