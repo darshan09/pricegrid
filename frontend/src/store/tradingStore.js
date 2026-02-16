@@ -188,7 +188,7 @@ export const useTradingStore = create((set, get) => ({
   // Grid prices (just numbers - visual suggestions only)
   gridPrices: [],
   
-  // ===== INDEPENDENT STATE =====
+  // ===== INDEPENDENT STATE (persisted) =====
   // Armed orders - SEPARATE from grid, keyed by targetPrice
   armedOrders: new Map(), // Map<targetPrice, OrderIntent>
   
@@ -202,7 +202,7 @@ export const useTradingStore = create((set, get) => ({
   // Confirmation dialog state
   confirmDialog: {
     isOpen: false,
-    type: null,
+    type: null, // 'CANCEL_ORDER' | 'SQUARE_OFF' | 'CANCEL_ALL' | 'SQUARE_OFF_ALL'
     targetPrice: null,
     message: '',
   },
@@ -217,6 +217,59 @@ export const useTradingStore = create((set, get) => ({
     qtyThresholds: [1, 5, 10, 25, 50, 100, 250, 500],
     autoRecalc: false,
     recalcStepMultiplier: 5,
+  },
+  
+  // ===== PERSISTENCE =====
+  
+  // Save state to localStorage
+  saveToStorage: () => {
+    const { armedOrders, trades, side, quantity, settings } = get();
+    const state = {
+      armedOrders: Array.from(armedOrders.entries()),
+      trades,
+      side,
+      quantity,
+      settings,
+      savedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem('tap-trade-state', JSON.stringify(state));
+    } catch (e) {
+      console.warn('Failed to save state:', e);
+    }
+  },
+  
+  // Load state from localStorage
+  loadFromStorage: () => {
+    try {
+      const saved = localStorage.getItem('tap-trade-state');
+      if (saved) {
+        const state = JSON.parse(saved);
+        // Only restore if saved within last hour
+        if (Date.now() - state.savedAt < 3600000) {
+          set({
+            armedOrders: new Map(state.armedOrders || []),
+            trades: state.trades || [],
+            side: state.side || Side.BUY,
+            quantity: state.quantity || 1,
+            settings: { ...get().settings, ...state.settings },
+          });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load state:', e);
+    }
+    return false;
+  },
+  
+  // Clear storage
+  clearStorage: () => {
+    try {
+      localStorage.removeItem('tap-trade-state');
+    } catch (e) {
+      console.warn('Failed to clear storage:', e);
+    }
   },
   
   // ===== HELPERS =====
