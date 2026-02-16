@@ -29,12 +29,16 @@ function App() {
     tickRate,
   });
   
-  const { initializeBlocks, updatePrice, trades } = useTradingStore();
+  const { initializeBlocks, updatePrice, trades, loadFromStorage } = useTradingStore();
   
-  // Initialize on mount
+  // Initialize on mount - load saved state first
   useEffect(() => {
+    const hasState = loadFromStorage();
     initializeBlocks(INITIAL_PRICE);
-  }, [initializeBlocks]);
+    if (hasState) {
+      console.log('Restored saved trading state');
+    }
+  }, [initializeBlocks, loadFromStorage]);
   
   // Update store price
   useEffect(() => {
