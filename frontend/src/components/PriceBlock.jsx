@@ -3,10 +3,19 @@ import { motion } from 'framer-motion';
 import { BlockState, useTradingStore, Side } from '../store/tradingStore';
 import { X, TrendingUp, TrendingDown } from 'lucide-react';
 
-const PriceBlock = ({ block, currentPrice }) => {
-  const { handleBlockClick, cancelBlock, side, trades } = useTradingStore();
+const PriceBlock = ({ targetPrice, currentPrice }) => {
+  const { 
+    handleBlockClick, 
+    cancelAtPrice, 
+    side, 
+    getBlockState,
+    getTradeForPrice,
+    settings 
+  } = useTradingStore();
   
-  const { id, label, targetPrice, state } = block;
+  // Get state from store (derived from armedOrders and trades)
+  const state = getBlockState(targetPrice);
+  const trade = state === BlockState.EXECUTED ? getTradeForPrice(targetPrice) : null;
   
   // Calculate delta and percentage
   const delta = targetPrice - currentPrice;
@@ -14,40 +23,38 @@ const PriceBlock = ({ block, currentPrice }) => {
   const percentChange = ((targetPrice - currentPrice) / currentPrice) * 100;
   const isPositive = delta >= 0;
   
-  // For executed blocks, show the trade P&L
-  const trade = trades.find(t => t.blockId === id && !t.isSquareOff);
+  // Calculate trade P&L for executed blocks
   let tradePnL = null;
-  if (trade && state === BlockState.EXECUTED) {
+  if (trade) {
     tradePnL = trade.side === Side.BUY 
       ? (currentPrice - trade.execPrice) * trade.qty
       : (trade.execPrice - currentPrice) * trade.qty;
   }
+  
+  // Deterministic block ID for React key
+  const blockId = `block-${settings.gridMode}-${side}-${targetPrice.toFixed(2)}`;
   
   // State-based styles
   const getStateStyles = () => {
     switch (state) {
       case BlockState.ARMED:
         return 'border-[#E0FF66] bg-[#E0FF66]/20 shadow-[0_0_20px_rgba(224,255,102,0.4),inset_0_0_20px_rgba(224,255,102,0.1)]';
-      case BlockState.TRIGGERED:
-        return 'border-[#E0FF66] bg-[#E0FF66]/60 shadow-[0_0_30px_rgba(224,255,102,0.7)]';
       case BlockState.EXECUTED:
         return tradePnL !== null && tradePnL >= 0
           ? 'border-green-400 bg-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.5)]'
           : 'border-red-400 bg-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.5)]';
-      case BlockState.CANCELLED:
-        return 'border-red-500/30 bg-red-500/5 opacity-40';
       default:
         return 'border-[#3D2840] bg-[#120A14] hover:bg-[#1A0F1C] hover:border-[#F555A2]/40';
     }
   };
   
   const handleClick = () => {
-    handleBlockClick(id);
+    handleBlockClick(targetPrice);
   };
   
   const handleCancel = (e) => {
     e.stopPropagation();
-    cancelBlock(id);
+    cancelAtPrice(targetPrice);
   };
   
   const isArmed = state === BlockState.ARMED;
@@ -55,6 +62,7 @@ const PriceBlock = ({ block, currentPrice }) => {
   
   return (
     <motion.div
+      key={blockId}
       className={`
         relative aspect-square rounded-md border-2 flex flex-col items-center justify-center 
         cursor-pointer select-none transition-colors duration-150 p-1
@@ -91,7 +99,7 @@ const PriceBlock = ({ block, currentPrice }) => {
       <span className={`text-sm md:text-base font-mono font-bold tracking-tight ${
         isExecuted ? (tradePnL >= 0 ? 'text-green-400' : 'text-red-400') : 'text-white'
       }`}>
-        {label}
+        ₹{targetPrice.toLocaleString('en-IN')}
       </span>
       
       {/* Delta display */}
