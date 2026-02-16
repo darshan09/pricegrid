@@ -636,6 +636,7 @@ export const useTradingStore = create((set, get) => ({
     });
     
     set({ armedOrders: newArmed });
+    get().saveToStorage();
   },
   
   // Cancel armed order at price
@@ -644,6 +645,7 @@ export const useTradingStore = create((set, get) => ({
     const newArmed = new Map(armedOrders);
     newArmed.delete(targetPrice);
     set({ armedOrders: newArmed });
+    get().saveToStorage();
   },
   
   // ===== TRIGGER CHECKING =====
