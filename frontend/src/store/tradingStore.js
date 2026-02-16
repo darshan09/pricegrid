@@ -51,11 +51,9 @@ function generateLtpLadder(snapshot, config) {
     ? (bestBid + bestAsk) / 2
     : ltp;
 
-  const spread = bestBid && bestAsk
-    ? bestAsk - bestBid
-    : tickSize;
-  
-  const step = Math.max(tickSize, spread);
+  // Use fixed step based on tick size (more stable than spread-based)
+  // Step = tickSize * 5 for reasonable spacing
+  const step = tickSize * 5;
 
   const prices = [];
 
