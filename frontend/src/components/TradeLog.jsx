@@ -23,31 +23,31 @@ const TradeLog = () => {
   const totalPnL = trades.reduce((sum, trade) => sum + getTradesPnL(trade), 0);
   
   return (
-    <div className="bg-dark-card rounded-lg border border-white/10 h-full flex flex-col" data-testid="trade-log">
+    <div className="bg-[#120A14] h-full flex flex-col" data-testid="trade-log">
       {/* Header */}
-      <div className="p-3 border-b border-white/10">
+      <div className="p-3 md:p-4 border-b border-[#3D2840]">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Trade Log</h3>
-          <span className="text-xs font-mono text-muted-foreground">{trades.length} trades</span>
+          <h3 className="text-xs md:text-sm font-semibold text-[#F555A2] uppercase tracking-wider">Trade Log</h3>
+          <span className="text-[10px] md:text-xs font-mono text-[#F555A2]/60">{trades.length} trades</span>
         </div>
         
         {/* Total P&L */}
         {trades.length > 0 && (
-          <div className={`mt-2 flex items-center gap-2 ${totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <div className={`mt-2 flex items-center gap-2 ${totalPnL >= 0 ? 'text-[#E0FF66]' : 'text-red-400'}`}>
             {totalPnL >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-            <span className="font-mono text-sm">
+            <span className="font-mono text-sm md:text-base font-bold">
               {totalPnL >= 0 ? '+' : ''}₹{totalPnL.toFixed(2)}
             </span>
-            <span className="text-xs text-muted-foreground">unrealized</span>
+            <span className="text-[10px] text-[#F555A2]/50">unrealized</span>
           </div>
         )}
       </div>
       
       {/* Trade list */}
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-2">
+        <div className="p-2 md:p-3 space-y-2">
           {sortedTrades.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">
+            <div className="text-center py-8 text-[#F555A2]/50 text-xs md:text-sm">
               No trades yet. Tap a price block to arm it.
             </div>
           ) : (
@@ -58,36 +58,36 @@ const TradeLog = () => {
               return (
                 <div
                   key={trade.id}
-                  className="bg-dark-void rounded-md p-3 border border-white/5"
+                  className="bg-[#0A0510] rounded-md p-2 md:p-3 border border-[#3D2840]"
                   data-testid={`trade-${trade.id}`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
+                    <span className={`text-[10px] md:text-xs font-bold uppercase px-2 py-0.5 rounded ${
                       isBuy ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                     }`}>
                       {trade.side}
                     </span>
-                    <span className="text-[10px] font-mono text-muted-foreground">
+                    <span className="text-[9px] md:text-[10px] font-mono text-[#F555A2]/50">
                       {new Date(trade.ts).toLocaleTimeString()}
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-[10px] md:text-xs">
                     <div>
-                      <span className="text-muted-foreground">Qty</span>
+                      <span className="text-[#F555A2]/50">Qty</span>
                       <p className="font-mono text-white">{trade.qty}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Target</span>
+                      <span className="text-[#F555A2]/50">Target</span>
                       <p className="font-mono text-white">₹{trade.triggerPrice}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Exec Price</span>
+                      <span className="text-[#F555A2]/50">Exec Price</span>
                       <p className="font-mono text-white">₹{trade.execPrice.toFixed(2)}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">P&L</span>
-                      <p className={`font-mono ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <span className="text-[#F555A2]/50">P&L</span>
+                      <p className={`font-mono font-bold ${pnl >= 0 ? 'text-[#E0FF66]' : 'text-red-400'}`}>
                         {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(2)}
                       </p>
                     </div>

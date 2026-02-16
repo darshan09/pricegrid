@@ -36,82 +36,82 @@ const ControlPanel = ({
   const executedCount = blocks.filter(b => b.state === BlockState.EXECUTED).length;
   
   return (
-    <div className="flex items-center justify-between gap-4 p-4 bg-dark-card border-b border-white/10">
+    <div className="flex items-center justify-between gap-4 p-3 md:p-4 bg-[#120A14] border-b border-[#3D2840]">
       {/* Left: Current Price */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 md:gap-6">
         <div data-testid="current-price-display">
-          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">NIFTY</span>
           <div className="flex items-center gap-2">
-            <span className="text-3xl md:text-4xl font-mono font-bold text-white text-glow-pink">
-              ₹{currentPrice.toFixed(2)}
-            </span>
+            <span className="text-xs font-mono uppercase tracking-wider text-[#F555A2]">NIFTY</span>
             {isRunning ? (
-              <Zap className="text-neon-lime animate-pulse" size={20} />
+              <Zap className="text-[#E0FF66] animate-pulse" size={14} />
             ) : (
-              <Pause className="text-muted-foreground" size={20} />
+              <Pause className="text-[#F555A2]/50" size={14} />
             )}
           </div>
+          <span className="text-2xl md:text-4xl font-mono font-bold text-white" style={{ textShadow: '0 0 20px rgba(245, 85, 162, 0.6)' }}>
+            ₹{currentPrice.toFixed(2)}
+          </span>
         </div>
         
         {/* Stats */}
-        <div className="hidden md:flex gap-4 ml-4 text-xs font-mono">
+        <div className="hidden md:flex gap-6 ml-4 text-xs font-mono">
           <div className="text-center">
-            <span className="text-muted-foreground block">Armed</span>
-            <span className="text-neon-lime font-bold">{armedCount}</span>
+            <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Armed</span>
+            <span className="text-[#E0FF66] font-bold text-lg">{armedCount}</span>
           </div>
           <div className="text-center">
-            <span className="text-muted-foreground block">Executed</span>
-            <span className="text-white font-bold">{executedCount}</span>
+            <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Executed</span>
+            <span className="text-white font-bold text-lg">{executedCount}</span>
           </div>
         </div>
       </div>
       
       {/* Center: BUY/SELL Toggle + Quantity */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         {/* Side Toggle */}
-        <div className="flex rounded-full border border-white/20 overflow-hidden" data-testid="side-toggle">
+        <div className="flex rounded-full overflow-hidden border border-[#3D2840]" data-testid="side-toggle">
           <button
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+            className={`px-3 md:px-5 py-2 text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
               side === Side.BUY 
-                ? 'bg-green-500 text-white' 
-                : 'bg-transparent text-muted-foreground hover:text-white'
+                ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]' 
+                : 'bg-transparent text-[#F555A2]/60 hover:text-white'
             }`}
             onClick={() => setSide(Side.BUY)}
             data-testid="buy-button"
           >
-            <TrendingUp size={14} className="inline mr-1" />
-            Buy
+            <TrendingUp size={12} />
+            <span className="hidden md:inline">Buy</span>
           </button>
           <button
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+            className={`px-3 md:px-5 py-2 text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
               side === Side.SELL 
-                ? 'bg-red-500 text-white' 
-                : 'bg-transparent text-muted-foreground hover:text-white'
+                ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
+                : 'bg-transparent text-[#F555A2]/60 hover:text-white'
             }`}
             onClick={() => setSide(Side.SELL)}
             data-testid="sell-button"
           >
-            <TrendingDown size={14} className="inline mr-1" />
-            Sell
+            <TrendingDown size={12} />
+            <span className="hidden md:inline">Sell</span>
           </button>
         </div>
         
         {/* Quantity */}
-        <div className="flex items-center gap-2 bg-dark-void rounded-lg px-3 py-1 border border-white/10">
-          <span className="text-xs text-muted-foreground">Qty</span>
+        <div className="flex items-center gap-1 md:gap-2 bg-[#0A0510] rounded-lg px-2 md:px-3 py-1 border border-[#3D2840]">
+          <span className="text-[10px] md:text-xs text-[#F555A2]/70">Qty</span>
           <button
-            className="w-6 h-6 rounded bg-white/10 text-white hover:bg-white/20 transition-colors"
+            className="w-5 h-5 md:w-6 md:h-6 rounded bg-[#3D2840] text-white hover:bg-[#F555A2]/30 transition-colors text-sm"
             onClick={() => setQuantity(quantity - 1)}
             disabled={quantity <= 1}
             data-testid="qty-decrease"
           >
             -
           </button>
-          <span className="font-mono font-bold text-white w-8 text-center" data-testid="quantity-display">
+          <span className="font-mono font-bold text-white w-6 md:w-8 text-center text-sm md:text-base" data-testid="quantity-display">
             {quantity}
           </span>
           <button
-            className="w-6 h-6 rounded bg-white/10 text-white hover:bg-white/20 transition-colors"
+            className="w-5 h-5 md:w-6 md:h-6 rounded bg-[#3D2840] text-white hover:bg-[#F555A2]/30 transition-colors text-sm"
             onClick={() => setQuantity(quantity + 1)}
             data-testid="qty-increase"
           >
@@ -121,16 +121,16 @@ const ControlPanel = ({
       </div>
       
       {/* Right: Controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 md:gap-2">
         {/* Play/Pause */}
         <Button
           variant="outline"
           size="icon"
           onClick={onToggle}
-          className="border-white/20 hover:bg-white/10"
+          className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-8 w-8 md:h-9 md:w-9"
           data-testid="play-pause-button"
         >
-          {isRunning ? <Pause size={18} /> : <Play size={18} />}
+          {isRunning ? <Pause size={16} /> : <Play size={16} />}
         </Button>
         
         {/* Reset */}
@@ -141,10 +141,10 @@ const ControlPanel = ({
             onReset();
             resetAllBlocks();
           }}
-          className="border-white/20 hover:bg-white/10"
+          className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-8 w-8 md:h-9 md:w-9"
           data-testid="reset-button"
         >
-          <RotateCcw size={18} />
+          <RotateCcw size={16} />
         </Button>
         
         {/* Settings */}
@@ -153,16 +153,16 @@ const ControlPanel = ({
             <Button
               variant="outline"
               size="icon"
-              className="border-white/20 hover:bg-white/10"
+              className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-8 w-8 md:h-9 md:w-9"
               data-testid="settings-button"
             >
-              <Settings size={18} />
+              <Settings size={16} />
             </Button>
           </SheetTrigger>
-          <SheetContent className="bg-dark-card border-white/10">
+          <SheetContent className="bg-[#120A14] border-[#3D2840]">
             <SheetHeader>
               <SheetTitle className="text-white">Simulation Settings</SheetTitle>
-              <SheetDescription className="text-muted-foreground">
+              <SheetDescription className="text-[#F555A2]/70">
                 Adjust the price simulation parameters
               </SheetDescription>
             </SheetHeader>
@@ -172,7 +172,7 @@ const ControlPanel = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-sm text-white">Volatility</label>
-                  <span className="text-xs font-mono text-muted-foreground">
+                  <span className="text-xs font-mono text-[#E0FF66]">
                     {(volatility * 100).toFixed(2)}%
                   </span>
                 </div>
@@ -185,7 +185,7 @@ const ControlPanel = ({
                   className="w-full"
                   data-testid="volatility-slider"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#F555A2]/60">
                   Higher volatility = bigger price swings
                 </p>
               </div>
@@ -194,7 +194,7 @@ const ControlPanel = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-sm text-white">Tick Rate</label>
-                  <span className="text-xs font-mono text-muted-foreground">
+                  <span className="text-xs font-mono text-[#E0FF66]">
                     {tickRate}ms ({(1000 / tickRate).toFixed(0)} Hz)
                   </span>
                 </div>
@@ -207,7 +207,7 @@ const ControlPanel = ({
                   className="w-full"
                   data-testid="tickrate-slider"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#F555A2]/60">
                   Lower = faster updates (more CPU)
                 </p>
               </div>
@@ -215,7 +215,7 @@ const ControlPanel = ({
               {/* Reset All */}
               <Button
                 variant="destructive"
-                className="w-full"
+                className="w-full bg-red-500 hover:bg-red-600"
                 onClick={() => {
                   onReset();
                   resetAllBlocks();

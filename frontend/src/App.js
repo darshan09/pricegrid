@@ -14,7 +14,7 @@ const INITIAL_PRICE = 2006;
 function App() {
   const [volatility, setVolatility] = useState(0.0005);
   const [tickRate, setTickRate] = useState(50);
-  const [chartDimensions, setChartDimensions] = useState({ width: 800, height: 200 });
+  const [chartDimensions, setChartDimensions] = useState({ width: 800, height: 180 });
   
   const { 
     currentPrice, 
@@ -59,15 +59,19 @@ function App() {
       const container = document.getElementById('chart-container');
       if (container) {
         setChartDimensions({
-          width: container.offsetWidth,
-          height: Math.min(250, window.innerHeight * 0.25),
+          width: container.offsetWidth - 32, // Account for padding
+          height: Math.min(200, Math.max(150, window.innerHeight * 0.2)),
         });
       }
     };
     
-    handleResize();
+    // Initial call after a small delay to ensure container is rendered
+    const timeoutId = setTimeout(handleResize, 100);
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
   
   const handleReset = useCallback(() => {
@@ -78,7 +82,7 @@ function App() {
   }, [resetSimulation, initializeBlocks]);
   
   return (
-    <div className="min-h-screen bg-dark-void text-white flex flex-col" data-testid="app-container">
+    <div className="min-h-screen bg-[#0A0510] text-white flex flex-col" data-testid="app-container">
       {/* Control Panel (Header) */}
       <ControlPanel
         currentPrice={currentPrice}
@@ -92,18 +96,18 @@ function App() {
       />
       
       {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:flex-row">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left/Main: Grid + Chart */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Price Grid */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto bg-[#0A0510]">
             <PriceGrid currentPrice={currentPrice} />
           </div>
           
           {/* Live Chart */}
           <div 
             id="chart-container" 
-            className="border-t border-white/10 p-4 bg-dark-card"
+            className="border-t border-[#3D2840] p-4 bg-[#120A14] shrink-0"
             data-testid="chart-section"
           >
             <LiveChart
@@ -116,7 +120,7 @@ function App() {
         </div>
         
         {/* Right: Trade Log */}
-        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-white/10">
+        <div className="w-full lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-[#3D2840] shrink-0">
           <TradeLog />
         </div>
       </div>
@@ -127,8 +131,8 @@ function App() {
         theme="dark"
         toastOptions={{
           style: {
-            background: '#0A0A0A',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: '#120A14',
+            border: '1px solid #3D2840',
             color: '#fff',
           },
         }}

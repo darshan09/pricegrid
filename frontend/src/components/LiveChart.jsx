@@ -27,15 +27,15 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     
     const w = width;
     const h = height;
-    const padding = { top: 20, right: 60, bottom: 30, left: 20 };
+    const padding = { top: 15, right: 55, bottom: 25, left: 15 };
     const chartWidth = w - padding.left - padding.right;
     const chartHeight = h - padding.top - padding.bottom;
     
     // Calculate price range
     const prices = priceHistory.map(p => p.price);
     const allPrices = [...prices, ...armedPrices, currentPrice];
-    const minPrice = Math.min(...allPrices) - 5;
-    const maxPrice = Math.max(...allPrices) + 5;
+    const minPrice = Math.min(...allPrices) - 3;
+    const maxPrice = Math.max(...allPrices) + 3;
     const priceRange = maxPrice - minPrice || 1;
     
     // Draw grid
@@ -43,7 +43,7 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
     ctx.lineWidth = 1;
     
     // Horizontal grid lines (price levels)
-    const gridLines = 5;
+    const gridLines = 4;
     for (let i = 0; i <= gridLines; i++) {
       const y = padding.top + (chartHeight * i) / gridLines;
       ctx.beginPath();
@@ -53,14 +53,14 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       
       // Price labels
       const price = maxPrice - (priceRange * i) / gridLines;
-      ctx.fillStyle = '#A1A1AA';
-      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#F555A2';
+      ctx.font = '9px "JetBrains Mono", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`₹${price.toFixed(0)}`, w - padding.right + 5, y + 4);
+      ctx.fillText(`₹${price.toFixed(0)}`, w - padding.right + 5, y + 3);
     }
     
-    // Vertical grid lines (time)
-    const vLines = 8;
+    // Vertical grid lines
+    const vLines = 6;
     for (let i = 0; i <= vLines; i++) {
       const x = padding.left + (chartWidth * i) / vLines;
       ctx.beginPath();
@@ -75,18 +75,18 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       
       ctx.strokeStyle = '#E0FF66';
       ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
       ctx.moveTo(padding.left, y);
       ctx.lineTo(w - padding.right, y);
       ctx.stroke();
       ctx.setLineDash([]);
       
-      // Label
+      // Label with glow
       ctx.fillStyle = '#E0FF66';
-      ctx.font = 'bold 9px "JetBrains Mono", monospace';
-      ctx.textAlign = 'right';
-      ctx.fillText(`₹${targetPrice}`, w - padding.right - 5, y - 5);
+      ctx.font = 'bold 8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`TARGET ₹${targetPrice}`, padding.left + 5, y - 4);
     });
     
     // Draw price line
@@ -96,17 +96,17 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
         y: padding.top + chartHeight * (1 - (point.price - minPrice) / priceRange),
       }));
       
-      // Glow effect (multiple strokes)
-      const glowColors = [
-        'rgba(245, 85, 162, 0.1)',
-        'rgba(245, 85, 162, 0.2)',
-        'rgba(245, 85, 162, 0.4)',
+      // Glow effect - multiple strokes with decreasing opacity
+      const glowLayers = [
+        { color: 'rgba(245, 85, 162, 0.05)', width: 12 },
+        { color: 'rgba(245, 85, 162, 0.1)', width: 8 },
+        { color: 'rgba(245, 85, 162, 0.2)', width: 5 },
+        { color: 'rgba(245, 85, 162, 0.4)', width: 3 },
       ];
-      const glowWidths = [8, 5, 3];
       
-      glowColors.forEach((color, i) => {
+      glowLayers.forEach(({ color, width: lineWidth }) => {
         ctx.strokeStyle = color;
-        ctx.lineWidth = glowWidths[i];
+        ctx.lineWidth = lineWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.beginPath();
@@ -127,26 +127,28 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       }
       ctx.stroke();
       
-      // Current price dot
+      // Current price dot with glow
       const lastPoint = points[points.length - 1];
       
-      // Outer glow
-      ctx.beginPath();
-      ctx.arc(lastPoint.x, lastPoint.y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(245, 85, 162, 0.3)';
-      ctx.fill();
+      // Outer glow rings
+      [12, 8, 5].forEach((radius, i) => {
+        ctx.beginPath();
+        ctx.arc(lastPoint.x, lastPoint.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(245, 85, 162, ${0.1 + i * 0.1})`;
+        ctx.fill();
+      });
       
       // Inner dot
       ctx.beginPath();
-      ctx.arc(lastPoint.x, lastPoint.y, 4, 0, Math.PI * 2);
+      ctx.arc(lastPoint.x, lastPoint.y, 3, 0, Math.PI * 2);
       ctx.fillStyle = '#F555A2';
       ctx.fill();
       
-      // Current price label
+      // White center
+      ctx.beginPath();
+      ctx.arc(lastPoint.x, lastPoint.y, 1.5, 0, Math.PI * 2);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 11px "JetBrains Mono", monospace';
-      ctx.textAlign = 'right';
-      ctx.fillText(`₹${currentPrice.toFixed(2)}`, lastPoint.x - 10, lastPoint.y - 10);
+      ctx.fill();
     }
     
     ctx.restore();
@@ -182,7 +184,7 @@ const LiveChart = ({ priceHistory, currentPrice, width = 800, height = 200 }) =>
       <canvas
         ref={canvasRef}
         className="rounded-lg"
-        style={{ background: '#050505' }}
+        style={{ background: '#0A0510' }}
         data-testid="live-chart-canvas"
       />
     </div>

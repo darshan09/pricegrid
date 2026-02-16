@@ -4,7 +4,7 @@ import { BlockState, useTradingStore } from '../store/tradingStore';
 import { X } from 'lucide-react';
 
 const PriceBlock = ({ block, currentPrice }) => {
-  const { armBlock, cancelBlock, resetBlock, side } = useTradingStore();
+  const { armBlock, cancelBlock, resetBlock } = useTradingStore();
   
   const { id, label, targetPrice, state } = block;
   
@@ -16,15 +16,15 @@ const PriceBlock = ({ block, currentPrice }) => {
   const getStateStyles = () => {
     switch (state) {
       case BlockState.ARMED:
-        return 'border-neon-lime/80 bg-neon-lime/10 animate-pulse-glow';
+        return 'border-[#E0FF66] bg-[#E0FF66]/20 shadow-[0_0_20px_rgba(224,255,102,0.4),inset_0_0_20px_rgba(224,255,102,0.1)]';
       case BlockState.TRIGGERED:
-        return 'border-neon-lime bg-neon-lime/50 animate-flash-trigger';
+        return 'border-[#E0FF66] bg-[#E0FF66]/60 shadow-[0_0_30px_rgba(224,255,102,0.7)]';
       case BlockState.EXECUTED:
-        return 'border-neon-lime bg-neon-lime text-black scale-105 z-10 glow-lime';
+        return 'border-[#E0FF66] bg-[#E0FF66] text-black shadow-[0_0_30px_rgba(224,255,102,0.8)] scale-105 z-10';
       case BlockState.CANCELLED:
         return 'border-red-500/50 bg-red-500/10 opacity-50';
       default:
-        return 'border-white/10 bg-dark-card hover:bg-white/5 hover:border-white/20';
+        return 'border-[#3D2840] bg-[#120A14] hover:bg-[#1A0F1C] hover:border-[#F555A2]/40';
     }
   };
   
@@ -41,53 +41,70 @@ const PriceBlock = ({ block, currentPrice }) => {
     cancelBlock(id);
   };
   
+  const isArmed = state === BlockState.ARMED;
+  const isExecuted = state === BlockState.EXECUTED;
+  
   return (
     <motion.div
       className={`
-        relative aspect-square rounded-md border flex flex-col items-center justify-center 
-        transition-all duration-100 cursor-pointer select-none
+        relative aspect-square rounded-md border-2 flex flex-col items-center justify-center 
+        cursor-pointer select-none transition-colors duration-150
         ${getStateStyles()}
       `}
       onClick={handleClick}
-      whileHover={{ scale: state === BlockState.IDLE ? 1.02 : 1 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: state === BlockState.IDLE ? 1.03 : 1 }}
+      whileTap={{ scale: 0.97 }}
+      animate={isArmed ? { 
+        boxShadow: [
+          '0 0 15px rgba(224,255,102,0.3), inset 0 0 15px rgba(224,255,102,0.05)',
+          '0 0 25px rgba(224,255,102,0.5), inset 0 0 25px rgba(224,255,102,0.1)',
+          '0 0 15px rgba(224,255,102,0.3), inset 0 0 15px rgba(224,255,102,0.05)',
+        ]
+      } : {}}
+      transition={isArmed ? { duration: 1.2, repeat: Infinity, ease: "easeInOut" } : {}}
       data-testid={`price-block-${targetPrice}`}
       data-state={state}
     >
       {/* Cancel button for armed blocks */}
-      {state === BlockState.ARMED && (
-        <button
+      {isArmed && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
           onClick={handleCancel}
-          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors z-20"
+          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors z-20 shadow-lg"
           data-testid={`cancel-block-${targetPrice}`}
         >
-          <X size={12} />
-        </button>
+          <X size={14} />
+        </motion.button>
       )}
       
       {/* Main price label */}
-      <span className={`text-lg font-mono font-bold ${state === BlockState.EXECUTED ? 'text-black' : 'text-white'}`}>
+      <span className={`text-base md:text-lg font-mono font-bold tracking-tight ${isExecuted ? 'text-black' : 'text-white'}`}>
         {label}
       </span>
       
       {/* Distance indicator */}
-      <span className={`text-xs font-mono mt-1 ${
-        state === BlockState.EXECUTED 
+      <span className={`text-[10px] md:text-xs font-mono mt-0.5 ${
+        isExecuted 
           ? 'text-black/70' 
-          : priceAbove ? 'text-red-400' : 'text-green-400'
+          : priceAbove ? 'text-[#F555A2]' : 'text-[#E0FF66]'
       }`}>
         {priceAbove ? '↓' : '↑'} ₹{priceDiff}
       </span>
       
       {/* State indicator */}
-      {state === BlockState.ARMED && (
-        <span className="absolute bottom-1 text-[9px] font-mono uppercase tracking-wider text-neon-lime">
-          Armed
-        </span>
+      {isArmed && (
+        <motion.span 
+          className="absolute bottom-1 text-[8px] md:text-[9px] font-mono uppercase tracking-widest text-[#E0FF66]"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        >
+          ARMED
+        </motion.span>
       )}
-      {state === BlockState.EXECUTED && (
-        <span className="absolute bottom-1 text-[9px] font-mono uppercase tracking-wider text-black/70">
-          Executed
+      {isExecuted && (
+        <span className="absolute bottom-1 text-[8px] md:text-[9px] font-mono uppercase tracking-widest text-black/80">
+          EXECUTED
         </span>
       )}
     </motion.div>
