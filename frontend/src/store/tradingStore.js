@@ -81,6 +81,8 @@ export const useTradingStore = create((set, get) => ({
     set({
       basePrice,
       blocks: generatePriceBlocks(basePrice, settings.gridSize),
+      orders: [],
+      trades: [],
     });
   },
   
