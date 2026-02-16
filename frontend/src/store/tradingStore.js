@@ -407,6 +407,7 @@ export const useTradingStore = create((set, get) => ({
       orders: updatedOrders,
       lastRecalcTime: Date.now(),
       lastRecalcPrice: currentPrice,
+      isRegenerating: false,
     });
   },
   
