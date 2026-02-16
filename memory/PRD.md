@@ -14,6 +14,7 @@ Build a Tap-to-Trade Price Blocks simulation with:
 **User Requirements**:
 - All prices in INR (₹) - no multipliers
 - Indian stock simulation (NIFTY)
+- Two grid generation modes: LTP Ladder & Depth Ladder
 
 ## Architecture
 
@@ -29,12 +30,12 @@ Build a Tap-to-Trade Price Blocks simulation with:
 ├── hooks/
 │   └── useMarketSimulation.js   # Price simulation engine
 ├── store/
-│   └── tradingStore.js          # Zustand state management
+│   └── tradingStore.js          # Zustand state (includes ladder generators)
 ├── components/
-│   ├── ControlPanel.jsx         # Header with controls
-│   ├── PriceGrid.jsx            # Grid container
+│   ├── ControlPanel.jsx         # Header with controls + settings
+│   ├── PriceGrid.jsx            # Dynamic grid container
 │   ├── PriceBlock.jsx           # Individual tappable block
-│   ├── LiveChart.jsx            # Canvas-based price chart
+│   ├── LiveChart.jsx            # Canvas chart with bid/ask lines
 │   └── TradeLog.jsx             # Trade history panel
 ```
 
@@ -51,18 +52,37 @@ Build a Tap-to-Trade Price Blocks simulation with:
 - [x] Quantity selector
 - [x] Auto-trigger when price crosses target
 - [x] Trade log with P&L
-- [x] Settings panel (volatility, tick rate)
+- [x] Settings panel (volatility, tick rate, grid config)
 - [x] Play/Pause/Reset controls
 - [x] Toast notifications on execution
 
 ## What's Been Implemented (Jan 2026)
+
+### Phase 1 - MVP
 1. **Price Simulation Engine** - Random walk with occasional spikes
 2. **48 Price Blocks Grid** - ₹2 increments around base price
 3. **Canvas Chart** - Pink glow line with target markers
 4. **Full State Machine** - IDLE → ARMED → EXECUTED flow
 5. **Trade Logging** - Real-time P&L calculations
-6. **Responsive Design** - Works on desktop and mobile
-7. **Neon Theme** - Dark void background with pink/lime accents
+
+### Phase 2 - Grid Ladder Modes (Current)
+1. **LTP_LADDER Mode** - Symmetric ladder centered around mid-price
+   - Uses (bestBid + bestAsk) / 2 as anchor
+   - Step = max(tickSize, spread)
+   - Stable and visually clean
+
+2. **DEPTH_LADDER Mode** - Market depth anchored
+   - BUY: Anchors above bestAsk
+   - SELL: Anchors below bestBid
+   - Breakout-style execution ladder
+   - Regenerates when switching BUY/SELL
+
+3. **Grid Configuration Settings**
+   - Ladder Mode toggle (LTP/DEPTH)
+   - Levels Per Side slider (5-25)
+   - Tick Size slider (₹0.01-₹1.00)
+
+4. **Enhanced Chart** - Shows bid/ask marker lines
 
 ## Prioritized Backlog
 
@@ -70,6 +90,7 @@ Build a Tap-to-Trade Price Blocks simulation with:
 - [x] Real-time price updates
 - [x] Block arming and execution
 - [x] Visual feedback for states
+- [x] Two grid generation modes
 
 ### P1 (High Priority)
 - [ ] Multi-block arming (arm multiple targets simultaneously)
@@ -78,13 +99,13 @@ Build a Tap-to-Trade Price Blocks simulation with:
 
 ### P2 (Medium Priority)
 - [ ] Candlestick chart option
-- [ ] Order book simulation
+- [ ] Order book simulation display
 - [ ] Position sizing calculator
 - [ ] Export trade history to CSV
 
 ### P3 (Nice to Have)
 - [ ] Multiple ticker support
-- [ ] Custom price step configuration
+- [ ] Real market data integration
 - [ ] Dark/Light theme toggle
 - [ ] Mobile app (React Native)
 
@@ -92,4 +113,4 @@ Build a Tap-to-Trade Price Blocks simulation with:
 1. Add multi-block arming capability
 2. Implement keyboard shortcuts for power users
 3. Add sound effects toggle in settings
-4. Consider position sizing/risk calculator
+4. Consider order book visualization
