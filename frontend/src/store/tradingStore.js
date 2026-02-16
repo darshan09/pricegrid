@@ -692,6 +692,7 @@ export const useTradingStore = create((set, get) => ({
   
   resetAll: () => {
     set({ armedOrders: new Map(), trades: [] });
+    get().clearStorage();
     get().regenerateGrid(true);
   },
   
