@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTradingStore, Side, BlockState, GridMode } from '../store/tradingStore';
+import { useTradingStore, Side, GridMode } from '../store/tradingStore';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { Switch } from './ui/switch';
@@ -47,20 +47,20 @@ const ControlPanel = ({
     quantity, 
     setSide, 
     setQuantity, 
-    resetAllBlocks, 
-    blocks, 
-    orders,
+    resetAll, 
     settings,
     setGridMode,
     setLevelsPerSide,
     setTickSize,
     setAutoRecalc,
     marketSnapshot,
-    regenerateBlocks
+    regenerateGrid,
+    getArmedCount,
+    getExecutedCount
   } = useTradingStore();
   
-  const armedCount = orders.filter(o => o.state === 'ARMED').length;
-  const executedCount = blocks.filter(b => b.state === BlockState.EXECUTED).length;
+  const armedCount = getArmedCount();
+  const executedCount = getExecutedCount();
   
   // Get mode display name
   const getModeDisplay = () => {
@@ -104,7 +104,7 @@ const ControlPanel = ({
             <span className="text-[#E0FF66] font-bold text-lg">{armedCount}</span>
           </div>
           <div className="text-center">
-            <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Executed</span>
+            <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Open</span>
             <span className="text-white font-bold text-lg">{executedCount}</span>
           </div>
           {/* Grid Mode indicator */}
@@ -187,7 +187,7 @@ const ControlPanel = ({
         <Button
           variant="outline"
           size="icon"
-          onClick={() => regenerateBlocks(true)}
+          onClick={() => regenerateGrid(true)}
           className="border-[#3D2840] hover:bg-[#E0FF66]/20 hover:border-[#E0FF66] h-8 w-8 md:h-9 md:w-9"
           title="Recalculate Grid"
           data-testid="recalc-button"
@@ -212,7 +212,7 @@ const ControlPanel = ({
           size="icon"
           onClick={() => {
             onReset();
-            resetAllBlocks();
+            resetAll();
           }}
           className="border-[#3D2840] hover:bg-[#F555A2]/20 hover:border-[#F555A2] h-8 w-8 md:h-9 md:w-9"
           data-testid="reset-button"
@@ -400,7 +400,7 @@ const ControlPanel = ({
                 className="w-full bg-red-500 hover:bg-red-600"
                 onClick={() => {
                   onReset();
-                  resetAllBlocks();
+                  resetAll();
                 }}
                 data-testid="reset-all-button"
               >
