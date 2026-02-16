@@ -4,6 +4,9 @@ A new take on the trading ladder — instead of a scrolling list of price levels
 
 This is a simulation UI exploring whether a grid-based interaction model could be a faster, more intuitive way to trade. It's an open experiment, and contributions are very welcome.
 
+![Armed positions with live P&L](./docs/screenshot-grid.png)
+![Square off all positions](./docs/screenshot-squareoff.png)
+
 ## What it does
 
 - Displays live price levels as a grid of blocks
