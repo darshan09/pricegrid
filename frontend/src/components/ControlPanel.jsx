@@ -2,6 +2,7 @@ import React from 'react';
 import { useTradingStore, Side, BlockState, GridMode } from '../store/tradingStore';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
+import { Switch } from './ui/switch';
 import { 
   Settings, 
   Play, 
@@ -11,7 +12,9 @@ import {
   TrendingDown,
   Zap,
   Layers,
-  BarChart3
+  BarChart3,
+  Activity,
+  RefreshCw
 } from 'lucide-react';
 import {
   Sheet,
@@ -51,11 +54,22 @@ const ControlPanel = ({
     setGridMode,
     setLevelsPerSide,
     setTickSize,
-    marketSnapshot
+    setAutoRecalc,
+    marketSnapshot,
+    regenerateBlocks
   } = useTradingStore();
   
   const armedCount = orders.filter(o => o.state === 'ARMED').length;
   const executedCount = blocks.filter(b => b.state === BlockState.EXECUTED).length;
+  
+  // Get mode display name
+  const getModeDisplay = () => {
+    switch (settings.gridMode) {
+      case GridMode.DEPTH_LADDER: return 'DEPTH';
+      case GridMode.LIQUIDITY_LADDER: return 'LIQ';
+      default: return 'LTP';
+    }
+  };
   
   return (
     <div className="flex items-center justify-between gap-4 p-3 md:p-4 bg-[#120A14] border-b border-[#3D2840]">
@@ -77,11 +91,14 @@ const ControlPanel = ({
           <div className="flex gap-2 text-[9px] md:text-[10px] font-mono mt-0.5">
             <span className="text-green-400">B: ₹{marketSnapshot.bestBid?.toFixed(2)}</span>
             <span className="text-red-400">A: ₹{marketSnapshot.bestAsk?.toFixed(2)}</span>
+            <span className="text-[#F555A2]/50">
+              Spread: ₹{((marketSnapshot.bestAsk || 0) - (marketSnapshot.bestBid || 0)).toFixed(2)}
+            </span>
           </div>
         </div>
         
         {/* Stats */}
-        <div className="hidden md:flex gap-6 ml-4 text-xs font-mono">
+        <div className="hidden md:flex gap-4 ml-4 text-xs font-mono">
           <div className="text-center">
             <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Armed</span>
             <span className="text-[#E0FF66] font-bold text-lg">{armedCount}</span>
@@ -93,10 +110,20 @@ const ControlPanel = ({
           {/* Grid Mode indicator */}
           <div className="text-center">
             <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Mode</span>
-            <span className="text-[#E0FF66] font-bold text-xs">
-              {settings.gridMode === GridMode.LTP_LADDER ? 'LTP' : 'DEPTH'}
+            <span className={`font-bold text-xs ${
+              settings.gridMode === GridMode.LIQUIDITY_LADDER ? 'text-blue-400' :
+              settings.gridMode === GridMode.DEPTH_LADDER ? 'text-[#F555A2]' : 'text-[#E0FF66]'
+            }`}>
+              {getModeDisplay()}
             </span>
           </div>
+          {/* Auto Recalc indicator */}
+          {settings.autoRecalc && (
+            <div className="text-center">
+              <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Auto</span>
+              <RefreshCw size={14} className="text-[#E0FF66] animate-spin mx-auto" style={{ animationDuration: '3s' }} />
+            </div>
+          )}
         </div>
       </div>
       
@@ -156,6 +183,18 @@ const ControlPanel = ({
       
       {/* Right: Controls */}
       <div className="flex items-center gap-1 md:gap-2">
+        {/* Manual Recalc */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => regenerateBlocks(true)}
+          className="border-[#3D2840] hover:bg-[#E0FF66]/20 hover:border-[#E0FF66] h-8 w-8 md:h-9 md:w-9"
+          title="Recalculate Grid"
+          data-testid="recalc-button"
+        >
+          <RefreshCw size={16} />
+        </Button>
+        
         {/* Play/Pause */}
         <Button
           variant="outline"
@@ -229,7 +268,13 @@ const ControlPanel = ({
                       <SelectItem value={GridMode.DEPTH_LADDER} className="text-white hover:bg-[#3D2840]">
                         <div className="flex items-center gap-2">
                           <Layers size={14} className="text-[#F555A2]" />
-                          <span>Depth Ladder (Bid/Ask Anchored)</span>
+                          <span>Depth Ladder (Bid/Ask)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value={GridMode.LIQUIDITY_LADDER} className="text-white hover:bg-[#3D2840]">
+                        <div className="flex items-center gap-2">
+                          <Activity size={14} className="text-blue-400" />
+                          <span>Liquidity Ladder (Impact Price)</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -237,8 +282,23 @@ const ControlPanel = ({
                   <p className="text-[10px] text-[#F555A2]/50">
                     {settings.gridMode === GridMode.LTP_LADDER 
                       ? 'Symmetric ladder centered around mid-price. Stable and clean.'
-                      : 'Anchored to best bid/ask. Moves with order book. Professional feel.'}
+                      : settings.gridMode === GridMode.DEPTH_LADDER
+                      ? 'Anchored to best bid/ask. Moves with order book.'
+                      : 'Based on cumulative order book depth. Shows impact price levels.'}
                   </p>
+                </div>
+                
+                {/* Auto Recalc Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs text-white">Auto Recalculate</label>
+                    <p className="text-[10px] text-[#F555A2]/50">Update grid when price moves</p>
+                  </div>
+                  <Switch
+                    checked={settings.autoRecalc}
+                    onCheckedChange={setAutoRecalc}
+                    data-testid="auto-recalc-switch"
+                  />
                 </div>
                 
                 {/* Levels Per Side */}
