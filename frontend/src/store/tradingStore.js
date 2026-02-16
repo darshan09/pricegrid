@@ -366,7 +366,7 @@ export const useTradingStore = create((set, get) => ({
   
   // Regenerate blocks based on current mode (with state preservation)
   regenerateBlocks: (force = false) => {
-    const { marketSnapshot, settings, side, blocks, shouldRecalculate, currentPrice, isRegenerating } = get();
+    const { marketSnapshot, settings, side, blocks, shouldRecalculate, currentPrice, isRegenerating, orders } = get();
     
     // Prevent concurrent regeneration
     if (isRegenerating) return;
@@ -392,12 +392,11 @@ export const useTradingStore = create((set, get) => ({
       prices = generateLtpLadder(snapshotWithTick, config);
     }
     
-    // Preserve states for prices that still exist
-    const newBlocks = generateBlocksFromPrices(prices, marketSnapshot.ltp, blocks);
+    // Preserve blocks that still exist (keeps IDs stable)
+    const newBlocks = generateBlocksFromPrices(prices, marketSnapshot.ltp, blocks, orders);
     
     // Find armed orders whose target prices no longer exist in new grid
     const newPriceSet = new Set(prices);
-    const { orders } = get();
     const updatedOrders = orders.map(order => {
       if (order.state === 'ARMED' && !newPriceSet.has(order.targetPrice)) {
         // Cancel orders that no longer have matching blocks
