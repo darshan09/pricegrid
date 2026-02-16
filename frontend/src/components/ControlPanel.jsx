@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTradingStore, Side, BlockState } from '../store/tradingStore';
+import { useTradingStore, Side, BlockState, GridMode } from '../store/tradingStore';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { 
@@ -9,7 +9,9 @@ import {
   RotateCcw,
   TrendingUp,
   TrendingDown,
-  Zap
+  Zap,
+  Layers,
+  BarChart3
 } from 'lucide-react';
 import {
   Sheet,
@@ -19,6 +21,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from './ui/sheet';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 const ControlPanel = ({ 
   currentPrice, 
@@ -30,14 +39,27 @@ const ControlPanel = ({
   tickRate,
   onTickRateChange
 }) => {
-  const { side, quantity, setSide, setQuantity, resetAllBlocks, blocks, orders } = useTradingStore();
+  const { 
+    side, 
+    quantity, 
+    setSide, 
+    setQuantity, 
+    resetAllBlocks, 
+    blocks, 
+    orders,
+    settings,
+    setGridMode,
+    setLevelsPerSide,
+    setTickSize,
+    marketSnapshot
+  } = useTradingStore();
   
   const armedCount = orders.filter(o => o.state === 'ARMED').length;
   const executedCount = blocks.filter(b => b.state === BlockState.EXECUTED).length;
   
   return (
     <div className="flex items-center justify-between gap-4 p-3 md:p-4 bg-[#120A14] border-b border-[#3D2840]">
-      {/* Left: Current Price */}
+      {/* Left: Current Price + Market Data */}
       <div className="flex items-center gap-3 md:gap-6">
         <div data-testid="current-price-display">
           <div className="flex items-center gap-2">
@@ -51,6 +73,11 @@ const ControlPanel = ({
           <span className="text-2xl md:text-4xl font-mono font-bold text-white" style={{ textShadow: '0 0 20px rgba(245, 85, 162, 0.6)' }}>
             ₹{currentPrice.toFixed(2)}
           </span>
+          {/* Bid/Ask display */}
+          <div className="flex gap-2 text-[9px] md:text-[10px] font-mono mt-0.5">
+            <span className="text-green-400">B: ₹{marketSnapshot.bestBid?.toFixed(2)}</span>
+            <span className="text-red-400">A: ₹{marketSnapshot.bestAsk?.toFixed(2)}</span>
+          </div>
         </div>
         
         {/* Stats */}
@@ -62,6 +89,13 @@ const ControlPanel = ({
           <div className="text-center">
             <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Executed</span>
             <span className="text-white font-bold text-lg">{executedCount}</span>
+          </div>
+          {/* Grid Mode indicator */}
+          <div className="text-center">
+            <span className="text-[#F555A2]/70 block uppercase tracking-wider text-[10px]">Mode</span>
+            <span className="text-[#E0FF66] font-bold text-xs">
+              {settings.gridMode === GridMode.LTP_LADDER ? 'LTP' : 'DEPTH'}
+            </span>
           </div>
         </div>
       </div>
@@ -159,57 +193,145 @@ const ControlPanel = ({
               <Settings size={16} />
             </Button>
           </SheetTrigger>
-          <SheetContent className="bg-[#120A14] border-[#3D2840]">
+          <SheetContent className="bg-[#120A14] border-[#3D2840] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-white">Simulation Settings</SheetTitle>
+              <SheetTitle className="text-white">Settings</SheetTitle>
               <SheetDescription className="text-[#F555A2]/70">
-                Adjust the price simulation parameters
+                Configure simulation and grid parameters
               </SheetDescription>
             </SheetHeader>
             
-            <div className="mt-8 space-y-8">
-              {/* Volatility */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm text-white">Volatility</label>
-                  <span className="text-xs font-mono text-[#E0FF66]">
-                    {(volatility * 100).toFixed(2)}%
-                  </span>
+            <div className="mt-6 space-y-6">
+              {/* GRID CONFIGURATION SECTION */}
+              <div className="space-y-4 p-4 bg-[#0A0510] rounded-lg border border-[#3D2840]">
+                <h4 className="text-sm font-semibold text-[#E0FF66] flex items-center gap-2">
+                  <Layers size={14} />
+                  Grid Configuration
+                </h4>
+                
+                {/* Grid Mode Toggle */}
+                <div className="space-y-2">
+                  <label className="text-xs text-white">Ladder Mode</label>
+                  <Select
+                    value={settings.gridMode}
+                    onValueChange={(value) => setGridMode(value)}
+                  >
+                    <SelectTrigger className="bg-[#120A14] border-[#3D2840] text-white" data-testid="grid-mode-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#120A14] border-[#3D2840]">
+                      <SelectItem value={GridMode.LTP_LADDER} className="text-white hover:bg-[#3D2840]">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 size={14} className="text-[#E0FF66]" />
+                          <span>LTP Ladder (Mid-Anchored)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value={GridMode.DEPTH_LADDER} className="text-white hover:bg-[#3D2840]">
+                        <div className="flex items-center gap-2">
+                          <Layers size={14} className="text-[#F555A2]" />
+                          <span>Depth Ladder (Bid/Ask Anchored)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-[#F555A2]/50">
+                    {settings.gridMode === GridMode.LTP_LADDER 
+                      ? 'Symmetric ladder centered around mid-price. Stable and clean.'
+                      : 'Anchored to best bid/ask. Moves with order book. Professional feel.'}
+                  </p>
                 </div>
-                <Slider
-                  value={[volatility * 10000]}
-                  onValueChange={([v]) => onVolatilityChange(v / 10000)}
-                  min={1}
-                  max={50}
-                  step={1}
-                  className="w-full"
-                  data-testid="volatility-slider"
-                />
-                <p className="text-xs text-[#F555A2]/60">
-                  Higher volatility = bigger price swings
-                </p>
+                
+                {/* Levels Per Side */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-white">Levels Per Side</label>
+                    <span className="text-xs font-mono text-[#E0FF66]">{settings.levelsPerSide}</span>
+                  </div>
+                  <Slider
+                    value={[settings.levelsPerSide]}
+                    onValueChange={([v]) => setLevelsPerSide(v)}
+                    min={5}
+                    max={25}
+                    step={1}
+                    className="w-full"
+                    data-testid="levels-slider"
+                  />
+                  <p className="text-[10px] text-[#F555A2]/50">
+                    Total blocks: {settings.levelsPerSide * 2 + 1}
+                  </p>
+                </div>
+                
+                {/* Tick Size */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-white">Tick Size</label>
+                    <span className="text-xs font-mono text-[#E0FF66]">₹{settings.tickSize.toFixed(2)}</span>
+                  </div>
+                  <Slider
+                    value={[settings.tickSize * 100]}
+                    onValueChange={([v]) => setTickSize(v / 100)}
+                    min={1}
+                    max={100}
+                    step={1}
+                    className="w-full"
+                    data-testid="tick-size-slider"
+                  />
+                  <p className="text-[10px] text-[#F555A2]/50">
+                    Minimum price increment
+                  </p>
+                </div>
               </div>
               
-              {/* Tick Rate */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm text-white">Tick Rate</label>
-                  <span className="text-xs font-mono text-[#E0FF66]">
-                    {tickRate}ms ({(1000 / tickRate).toFixed(0)} Hz)
-                  </span>
+              {/* SIMULATION SECTION */}
+              <div className="space-y-4 p-4 bg-[#0A0510] rounded-lg border border-[#3D2840]">
+                <h4 className="text-sm font-semibold text-[#F555A2] flex items-center gap-2">
+                  <Zap size={14} />
+                  Simulation
+                </h4>
+                
+                {/* Volatility */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-white">Volatility</label>
+                    <span className="text-xs font-mono text-[#E0FF66]">
+                      {(volatility * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[volatility * 10000]}
+                    onValueChange={([v]) => onVolatilityChange(v / 10000)}
+                    min={1}
+                    max={50}
+                    step={1}
+                    className="w-full"
+                    data-testid="volatility-slider"
+                  />
+                  <p className="text-[10px] text-[#F555A2]/50">
+                    Higher = bigger price swings
+                  </p>
                 </div>
-                <Slider
-                  value={[tickRate]}
-                  onValueChange={([v]) => onTickRateChange(v)}
-                  min={20}
-                  max={200}
-                  step={10}
-                  className="w-full"
-                  data-testid="tickrate-slider"
-                />
-                <p className="text-xs text-[#F555A2]/60">
-                  Lower = faster updates (more CPU)
-                </p>
+                
+                {/* Tick Rate */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-white">Tick Rate</label>
+                    <span className="text-xs font-mono text-[#E0FF66]">
+                      {tickRate}ms ({(1000 / tickRate).toFixed(0)} Hz)
+                    </span>
+                  </div>
+                  <Slider
+                    value={[tickRate]}
+                    onValueChange={([v]) => onTickRateChange(v)}
+                    min={20}
+                    max={200}
+                    step={10}
+                    className="w-full"
+                    data-testid="tickrate-slider"
+                  />
+                  <p className="text-[10px] text-[#F555A2]/50">
+                    Lower = faster updates (more CPU)
+                  </p>
+                </div>
               </div>
               
               {/* Reset All */}
