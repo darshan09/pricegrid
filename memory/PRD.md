@@ -77,12 +77,28 @@ Build a Tap-to-Trade Price Blocks simulation with:
    - Breakout-style execution ladder
    - Regenerates when switching BUY/SELL
 
-3. **Grid Configuration Settings**
-   - Ladder Mode toggle (LTP/DEPTH)
+3. **LIQUIDITY_LADDER Mode** - Impact price grid (Phase 2 Advanced)
+   - Generates blocks from cumulative order book depth
+   - Uses qty thresholds: [1, 5, 10, 25, 50, 100, 250, 500]
+   - Shows "impact price" levels based on liquidity
+
+4. **Grid Configuration Settings**
+   - Ladder Mode toggle (LTP/DEPTH/LIQUIDITY)
    - Levels Per Side slider (5-25)
    - Tick Size slider (₹0.01-₹1.00)
+   - Auto-recalc toggle with throttling (max 5/sec)
 
-4. **Enhanced Chart** - Shows bid/ask marker lines
+5. **Enhanced Price Display**
+   - Delta (₹X.XX) with directional arrows
+   - Percentage change (+/-X.XX%)
+   - Color coding: green positive, pink negative
+
+6. **Confirmation Dialogs**
+   - Armed block re-click: "Cancel this order?"
+   - Executed block re-click: "Square off this trade?"
+   - Square-off creates opposite trade with realized P&L
+
+7. **Enhanced Chart** - Shows bid/ask marker lines
 
 ## Prioritized Backlog
 
