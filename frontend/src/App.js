@@ -31,24 +31,23 @@ function App() {
   
   const { initializeBlocks, updatePrice, trades } = useTradingStore();
   
-  // Initialize blocks on mount
+  // Initialize on mount
   useEffect(() => {
     initializeBlocks(INITIAL_PRICE);
   }, [initializeBlocks]);
   
-  // Update store price whenever simulation price changes
+  // Update store price
   useEffect(() => {
     updatePrice(currentPrice);
   }, [currentPrice, updatePrice]);
   
-  // Track trades and show toast on execution
+  // Track trades for toast notifications
   const [lastTradeCount, setLastTradeCount] = useState(0);
   useEffect(() => {
     if (trades.length > lastTradeCount) {
       const newTrade = trades[trades.length - 1];
       
       if (newTrade.isSquareOff) {
-        // Square-off trade
         const originalTrade = trades.find(t => t.id === newTrade.originalTradeId);
         const pnl = originalTrade
           ? (originalTrade.side === 'BUY' 
@@ -61,7 +60,6 @@ function App() {
           duration: 4000,
         });
       } else {
-        // New trade execution
         toast.success(`${newTrade.side} Order Executed!`, {
           description: `${newTrade.qty} @ ₹${newTrade.execPrice.toFixed(2)}`,
           duration: 3000,
@@ -71,7 +69,7 @@ function App() {
     }
   }, [trades, lastTradeCount]);
   
-  // Handle window resize for chart
+  // Handle resize
   useEffect(() => {
     const handleResize = () => {
       const container = document.getElementById('chart-container');
@@ -100,7 +98,7 @@ function App() {
   
   return (
     <div className="min-h-screen bg-[#0A0510] text-white flex flex-col" data-testid="app-container">
-      {/* Control Panel (Header) */}
+      {/* Control Panel */}
       <ControlPanel
         currentPrice={currentPrice}
         isRunning={isRunning}
@@ -114,7 +112,7 @@ function App() {
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Left/Main: Grid + Chart */}
+        {/* Grid + Chart */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Price Grid */}
           <div className="flex-1 overflow-auto bg-[#0A0510]">
@@ -136,7 +134,7 @@ function App() {
           </div>
         </div>
         
-        {/* Right: Trade Log */}
+        {/* Trade Log */}
         <div className="w-full lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l border-[#3D2840] shrink-0">
           <TradeLog />
         </div>
@@ -145,7 +143,7 @@ function App() {
       {/* Confirmation Dialog */}
       <ConfirmDialog />
       
-      {/* Toast notifications */}
+      {/* Toast */}
       <Toaster 
         position="bottom-right" 
         theme="dark"
