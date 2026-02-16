@@ -7,15 +7,14 @@ const TradeLog = () => {
   const trades = useTradingStore(state => state.trades);
   const currentPrice = useTradingStore(state => state.currentPrice);
   const getTotalPnL = useTradingStore(state => state.getTotalPnL);
+  const getExecutedCount = useTradingStore(state => state.getExecutedCount);
   
   // Sort by most recent first
   const sortedTrades = [...trades].reverse();
   
-  // Calculate total P&L using the store method
+  // Calculate total P&L
   const totalPnL = getTotalPnL();
-  
-  // Count open vs closed positions
-  const openPositions = trades.filter(t => !t.isSquareOff).length - trades.filter(t => t.isSquareOff).length;
+  const openPositions = getExecutedCount();
   
   return (
     <div className="bg-[#120A14] h-full flex flex-col" data-testid="trade-log">
@@ -57,7 +56,7 @@ const TradeLog = () => {
               const isBuy = trade.side === Side.BUY;
               const isSquareOff = trade.isSquareOff;
               
-              // Calculate P&L for this specific trade
+              // Calculate P&L
               let pnl = 0;
               if (isSquareOff) {
                 const originalTrade = trades.find(t => t.id === trade.originalTradeId);
@@ -67,11 +66,21 @@ const TradeLog = () => {
                     : (originalTrade.execPrice - trade.execPrice) * originalTrade.qty;
                 }
               } else {
-                // Open position - unrealized P&L
-                pnl = trade.side === Side.BUY
-                  ? (currentPrice - trade.execPrice) * trade.qty
-                  : (trade.execPrice - currentPrice) * trade.qty;
+                // Check if closed
+                const closeTrade = trades.find(t => t.originalTradeId === trade.id);
+                if (closeTrade) {
+                  pnl = trade.side === Side.BUY
+                    ? (closeTrade.execPrice - trade.execPrice) * trade.qty
+                    : (trade.execPrice - closeTrade.execPrice) * trade.qty;
+                } else {
+                  // Open position
+                  pnl = trade.side === Side.BUY
+                    ? (currentPrice - trade.execPrice) * trade.qty
+                    : (trade.execPrice - currentPrice) * trade.qty;
+                }
               }
+              
+              const isClosed = isSquareOff || trades.some(t => t.originalTradeId === trade.id);
               
               return (
                 <div
@@ -88,7 +97,7 @@ const TradeLog = () => {
                       {isSquareOff ? (
                         <span className="text-[10px] md:text-xs font-bold uppercase px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 flex items-center gap-1">
                           <ArrowLeftRight size={10} />
-                          SQUARE OFF
+                          EXIT
                         </span>
                       ) : (
                         <span className={`text-[10px] md:text-xs font-bold uppercase px-2 py-0.5 rounded ${
@@ -96,6 +105,9 @@ const TradeLog = () => {
                         }`}>
                           {trade.side}
                         </span>
+                      )}
+                      {!isSquareOff && isClosed && (
+                        <span className="text-[8px] text-[#F555A2]/50">CLOSED</span>
                       )}
                     </div>
                     <span className="text-[9px] md:text-[10px] font-mono text-[#F555A2]/50">
@@ -110,7 +122,7 @@ const TradeLog = () => {
                     </div>
                     <div>
                       <span className="text-[#F555A2]/50">{isSquareOff ? 'Exit' : 'Target'}</span>
-                      <p className="font-mono text-white">₹{trade.triggerPrice.toFixed(2)}</p>
+                      <p className="font-mono text-white">₹{trade.targetPrice.toFixed(2)}</p>
                     </div>
                     <div>
                       <span className="text-[#F555A2]/50">Exec Price</span>
@@ -120,7 +132,7 @@ const TradeLog = () => {
                       <span className="text-[#F555A2]/50">P&L</span>
                       <p className={`font-mono font-bold ${pnl >= 0 ? 'text-[#E0FF66]' : 'text-red-400'}`}>
                         {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(2)}
-                        {!isSquareOff && <span className="text-[8px] ml-1 opacity-50">live</span>}
+                        {!isSquareOff && !isClosed && <span className="text-[8px] ml-1 opacity-50">live</span>}
                       </p>
                     </div>
                   </div>
