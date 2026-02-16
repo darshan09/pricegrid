@@ -328,12 +328,19 @@ export const useTradingStore = create((set, get) => ({
     const { type, targetPrice } = confirmDialog;
     
     if (type === 'CANCEL_ORDER') {
-      // Remove from armed orders
+      // Remove single order from armed orders
       const newArmed = new Map(armedOrders);
       newArmed.delete(targetPrice);
       set({ armedOrders: newArmed });
+      get().saveToStorage();
+      
+    } else if (type === 'CANCEL_ALL') {
+      // Cancel ALL armed orders
+      set({ armedOrders: new Map() });
+      get().saveToStorage();
       
     } else if (type === 'SQUARE_OFF') {
+      // Square off single position
       const originalTrade = trades.find(t => 
         t.targetPrice === targetPrice && !t.isSquareOff
       );
@@ -354,10 +361,68 @@ export const useTradingStore = create((set, get) => ({
         };
         
         set({ trades: [...trades, squareOffTrade] });
+        get().saveToStorage();
       }
+      
+    } else if (type === 'SQUARE_OFF_ALL') {
+      // Square off ALL open positions
+      const now = Date.now();
+      const openTrades = get().getOpenTrades();
+      
+      const squareOffTrades = openTrades.map(originalTrade => ({
+        id: generateId(),
+        ts: now,
+        side: originalTrade.side === Side.BUY ? Side.SELL : Side.BUY,
+        qty: originalTrade.qty,
+        targetPrice: currentPrice,
+        execPrice: currentPrice,
+        isSquareOff: true,
+        originalTradeId: originalTrade.id,
+      }));
+      
+      set({ trades: [...trades, ...squareOffTrades] });
+      get().saveToStorage();
     }
     
     get().closeConfirmDialog();
+  },
+  
+  // ===== BULK ACTIONS =====
+  
+  // Show cancel all confirmation
+  showCancelAllDialog: () => {
+    const count = get().armedOrders.size;
+    if (count === 0) return;
+    
+    get().openConfirmDialog(
+      'CANCEL_ALL',
+      null,
+      `Cancel all ${count} armed order${count > 1 ? 's' : ''}?`
+    );
+  },
+  
+  // Show square off all confirmation
+  showSquareOffAllDialog: () => {
+    const openTrades = get().getOpenTrades();
+    if (openTrades.length === 0) return;
+    
+    const totalPnL = get().getTotalPnL();
+    const pnlStr = totalPnL >= 0 ? `+₹${totalPnL.toFixed(2)}` : `-₹${Math.abs(totalPnL).toFixed(2)}`;
+    
+    get().openConfirmDialog(
+      'SQUARE_OFF_ALL',
+      null,
+      `Square off all ${openTrades.length} open position${openTrades.length > 1 ? 's' : ''}? Total P&L: ${pnlStr}`
+    );
+  },
+  
+  // Get open (non-squared-off) trades
+  getOpenTrades: () => {
+    const { trades } = get();
+    const closedIds = new Set(
+      trades.filter(t => t.isSquareOff).map(t => t.originalTradeId)
+    );
+    return trades.filter(t => !t.isSquareOff && !closedIds.has(t.id));
   },
   
   // ===== GRID REGENERATION =====
