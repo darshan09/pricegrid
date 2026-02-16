@@ -36,8 +36,23 @@ function App() {
     const hasState = loadFromStorage();
     // Initialize grid but preserve any loaded armed orders and trades
     if (hasState) {
-      // Only regenerate grid prices, don't clear state
-      useTradingStore.getState().regenerateGrid(true);
+      // Initialize market snapshot and grid prices without clearing armed orders/trades
+      const store = useTradingStore.getState();
+      const tickSize = store.settings.tickSize;
+      const spread = tickSize * 5;
+      
+      // Update market snapshot with initial price
+      store.marketSnapshot.ltp = INITIAL_PRICE;
+      store.marketSnapshot.bestBid = INITIAL_PRICE - spread / 2;
+      store.marketSnapshot.bestAsk = INITIAL_PRICE + spread / 2;
+      
+      // Update price and regenerate grid
+      useTradingStore.setState({ 
+        basePrice: INITIAL_PRICE, 
+        currentPrice: INITIAL_PRICE,
+        lastRecalcPrice: INITIAL_PRICE
+      });
+      store.regenerateGrid(true);
       console.log('Restored saved trading state');
     } else {
       initializeBlocks(INITIAL_PRICE);
