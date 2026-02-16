@@ -235,6 +235,7 @@ export const useTradingStore = create((set, get) => ({
   // Recalculation throttle
   lastRecalcTime: 0,
   recalcThrottleMs: 200, // Max 5 times per second
+  isRegenerating: false, // Flag to prevent clicks during regeneration
   
   // Confirmation dialog state
   confirmDialog: {
