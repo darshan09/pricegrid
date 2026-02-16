@@ -31,12 +31,16 @@ function App() {
   
   const { initializeBlocks, updatePrice, trades, loadFromStorage } = useTradingStore();
   
-  // Initialize on mount - load saved state first
+  // Initialize on mount - load saved state first, then initialize grid without clearing state
   useEffect(() => {
     const hasState = loadFromStorage();
-    initializeBlocks(INITIAL_PRICE);
+    // Initialize grid but preserve any loaded armed orders and trades
     if (hasState) {
+      // Only regenerate grid prices, don't clear state
+      useTradingStore.getState().regenerateGrid(true);
       console.log('Restored saved trading state');
+    } else {
+      initializeBlocks(INITIAL_PRICE);
     }
   }, [initializeBlocks, loadFromStorage]);
   
