@@ -18,20 +18,107 @@ export const Side = {
   SELL: 'SELL',
 };
 
-// Generate price blocks around a base price
+// Grid modes
+export const GridMode = {
+  LTP_LADDER: 'LTP_LADDER',
+  DEPTH_LADDER: 'DEPTH_LADDER',
+};
+
+// ============ UTILITY FUNCTIONS ============
+
+// Round to tick size
+function roundToTick(price, tick) {
+  return Math.round(price / tick) * tick;
+}
+
+// Clamp to positive
+function safePrice(price) {
+  return Math.max(price, 0);
+}
+
+// ============ OPTION A: LTP-Based Tick Ladder ============
+function generateLtpLadder(snapshot, config) {
+  const { ltp, bestBid, bestAsk, tickSize } = snapshot;
+  const { levelsPerSide } = config;
+
+  // Mid price calculation
+  const mid = bestBid && bestAsk
+    ? (bestBid + bestAsk) / 2
+    : ltp;
+
+  // Step calculation (spread-aware)
+  const spread = bestBid && bestAsk
+    ? bestAsk - bestBid
+    : tickSize;
+  
+  const step = Math.max(tickSize, spread);
+
+  const prices = [];
+
+  for (let k = -levelsPerSide; k <= levelsPerSide; k++) {
+    const raw = mid + k * step;
+    const rounded = roundToTick(raw, tickSize);
+    prices.push(safePrice(rounded));
+  }
+
+  // Remove duplicates and sort descending
+  return [...new Set(prices)].sort((a, b) => b - a);
+}
+
+// ============ OPTION B: Market Depth Anchored Ladder ============
+function generateDepthLadder(snapshot, config, side) {
+  const { bestBid, bestAsk, tickSize, ltp } = snapshot;
+  const { levelsPerSide } = config;
+
+  // Fallback to LTP if no depth
+  if (!bestBid || !bestAsk) {
+    console.warn("No depth data, falling back to LTP ladder");
+    return generateLtpLadder(snapshot, config);
+  }
+
+  // Anchor based on side
+  const anchor = side === Side.BUY ? bestAsk : bestBid;
+
+  const prices = [];
+
+  for (let i = 0; i < levelsPerSide * 2 + 1; i++) {
+    const offset = i - levelsPerSide;
+
+    let raw;
+    if (side === Side.BUY) {
+      raw = anchor + offset * tickSize;
+    } else {
+      raw = anchor - offset * tickSize;
+    }
+
+    prices.push(roundToTick(raw, tickSize));
+  }
+
+  // Remove duplicates and sort descending
+  return [...new Set(prices)].sort((a, b) => b - a);
+}
+
+// Generate price blocks from prices array
+const generateBlocksFromPrices = (prices, currentLtp) => {
+  return prices.map(targetPrice => ({
+    id: generateId(),
+    label: `₹${targetPrice.toLocaleString('en-IN')}`,
+    targetPrice,
+    state: BlockState.IDLE,
+    createdAt: Date.now(),
+  }));
+};
+
+// Legacy grid generation (for backwards compatibility)
 const generatePriceBlocks = (basePrice, gridSize = { rows: 6, cols: 8 }) => {
   const blocks = [];
-  const priceStep = 2; // ₹2 increments
+  const priceStep = 2;
   const totalBlocks = gridSize.rows * gridSize.cols;
-  const midPoint = Math.floor(totalBlocks / 2);
   
   for (let i = 0; i < totalBlocks; i++) {
-    // Calculate price offset from center
     const row = Math.floor(i / gridSize.cols);
     const col = i % gridSize.cols;
     
-    // Higher prices at top, lower at bottom
-    // Left to right: lower to higher within row
     const rowOffset = (gridSize.rows - 1 - row) * priceStep * gridSize.cols / 2;
     const colOffset = (col - gridSize.cols / 2) * priceStep;
     
@@ -46,9 +133,7 @@ const generatePriceBlocks = (basePrice, gridSize = { rows: 6, cols: 8 }) => {
     });
   }
   
-  // Sort by price descending (highest at top-left)
   blocks.sort((a, b) => b.targetPrice - a.targetPrice);
-  
   return blocks;
 };
 
@@ -56,6 +141,16 @@ export const useTradingStore = create((set, get) => ({
   // Current market state
   basePrice: 2006,
   currentPrice: 2006.16,
+  
+  // Market snapshot for ladder generation
+  marketSnapshot: {
+    ltp: 2006.16,
+    bestBid: 2006.00,
+    bestAsk: 2006.50,
+    tickSize: 0.05,
+    bids: [],
+    asks: [],
+  },
   
   // Trading side
   side: Side.BUY,
@@ -73,22 +168,94 @@ export const useTradingStore = create((set, get) => ({
     volatility: 0.0005,
     tickRate: 50,
     gridSize: { rows: 6, cols: 8 },
+    gridMode: GridMode.LTP_LADDER,
+    levelsPerSide: 12,
+    tickSize: 0.05,
+  },
+  
+  // Update market snapshot
+  updateMarketSnapshot: (snapshot) => {
+    set({ marketSnapshot: { ...get().marketSnapshot, ...snapshot } });
+  },
+  
+  // Regenerate blocks based on current mode
+  regenerateBlocks: () => {
+    const { marketSnapshot, settings, side } = get();
+    const { gridMode, levelsPerSide, tickSize } = settings;
+    
+    const config = { levelsPerSide };
+    const snapshotWithTick = { ...marketSnapshot, tickSize };
+    
+    let prices;
+    if (gridMode === GridMode.DEPTH_LADDER) {
+      prices = generateDepthLadder(snapshotWithTick, config, side);
+    } else {
+      prices = generateLtpLadder(snapshotWithTick, config);
+    }
+    
+    const blocks = generateBlocksFromPrices(prices, marketSnapshot.ltp);
+    
+    set({ blocks, orders: [], trades: [] });
   },
   
   // Initialize blocks
   initializeBlocks: (basePrice) => {
-    const { settings } = get();
+    const { settings, side } = get();
+    const { gridMode, levelsPerSide, tickSize } = settings;
+    
+    // Create initial market snapshot
+    const spread = tickSize * 5;
+    const snapshot = {
+      ltp: basePrice,
+      bestBid: basePrice - spread / 2,
+      bestAsk: basePrice + spread / 2,
+      tickSize,
+      bids: [],
+      asks: [],
+    };
+    
+    const config = { levelsPerSide };
+    
+    let prices;
+    if (gridMode === GridMode.DEPTH_LADDER) {
+      prices = generateDepthLadder(snapshot, config, side);
+    } else {
+      prices = generateLtpLadder(snapshot, config);
+    }
+    
+    const blocks = generateBlocksFromPrices(prices, basePrice);
+    
     set({
       basePrice,
-      blocks: generatePriceBlocks(basePrice, settings.gridSize),
+      marketSnapshot: snapshot,
+      blocks,
       orders: [],
       trades: [],
     });
   },
   
-  // Update current price
+  // Update current price (and simulate depth)
   updatePrice: (price) => {
-    set({ currentPrice: price });
+    const { settings } = get();
+    const { tickSize } = settings;
+    
+    // Simulate spread (random 1-10 ticks)
+    const spreadTicks = Math.floor(Math.random() * 10) + 1;
+    const spread = spreadTicks * tickSize;
+    
+    const bestBid = roundToTick(price - spread / 2, tickSize);
+    const bestAsk = roundToTick(price + spread / 2, tickSize);
+    
+    set({ 
+      currentPrice: price,
+      marketSnapshot: {
+        ...get().marketSnapshot,
+        ltp: price,
+        bestBid,
+        bestAsk,
+      }
+    });
+    
     // Check for triggers
     get().checkTriggers(price);
   },
@@ -98,13 +265,50 @@ export const useTradingStore = create((set, get) => ({
     set(state => ({
       side: state.side === Side.BUY ? Side.SELL : Side.BUY,
     }));
+    // Regenerate blocks if in DEPTH_LADDER mode
+    const { settings } = get();
+    if (settings.gridMode === GridMode.DEPTH_LADDER) {
+      get().regenerateBlocks();
+    }
   },
   
   // Set side directly
-  setSide: (side) => set({ side }),
+  setSide: (side) => {
+    set({ side });
+    // Regenerate blocks if in DEPTH_LADDER mode
+    const { settings } = get();
+    if (settings.gridMode === GridMode.DEPTH_LADDER) {
+      get().regenerateBlocks();
+    }
+  },
   
   // Set quantity
   setQuantity: (quantity) => set({ quantity: Math.max(1, quantity) }),
+  
+  // Set grid mode
+  setGridMode: (mode) => {
+    set(state => ({
+      settings: { ...state.settings, gridMode: mode }
+    }));
+    get().regenerateBlocks();
+  },
+  
+  // Set levels per side
+  setLevelsPerSide: (levels) => {
+    set(state => ({
+      settings: { ...state.settings, levelsPerSide: levels }
+    }));
+    get().regenerateBlocks();
+  },
+  
+  // Set tick size
+  setTickSize: (tickSize) => {
+    set(state => ({
+      settings: { ...state.settings, tickSize },
+      marketSnapshot: { ...state.marketSnapshot, tickSize }
+    }));
+    get().regenerateBlocks();
+  },
   
   // Arm a block (create order intent)
   armBlock: (blockId) => {
@@ -115,7 +319,6 @@ export const useTradingStore = create((set, get) => ({
     
     const now = Date.now();
     
-    // Update block state
     set({
       blocks: blocks.map(b =>
         b.id === blockId
@@ -157,7 +360,7 @@ export const useTradingStore = create((set, get) => ({
   
   // Check if any armed blocks should trigger
   checkTriggers: (currentPrice) => {
-    const { blocks, orders, trades, side } = get();
+    const { blocks, orders, trades } = get();
     const now = Date.now();
     
     const armedOrders = orders.filter(o => o.state === 'ARMED');
@@ -177,7 +380,6 @@ export const useTradingStore = create((set, get) => ({
         : currentPrice >= order.targetPrice;
       
       if (shouldTrigger) {
-        // Update block
         const blockIndex = updatedBlocks.findIndex(b => b.id === order.blockId);
         if (blockIndex !== -1) {
           updatedBlocks[blockIndex] = {
@@ -188,7 +390,6 @@ export const useTradingStore = create((set, get) => ({
           };
         }
         
-        // Update order
         const orderIndex = updatedOrders.findIndex(o => o.id === order.id);
         if (orderIndex !== -1) {
           updatedOrders[orderIndex] = {
@@ -200,7 +401,6 @@ export const useTradingStore = create((set, get) => ({
           };
         }
         
-        // Create trade
         newTrades.push({
           id: generateId(),
           ts: now,
@@ -236,12 +436,7 @@ export const useTradingStore = create((set, get) => ({
   
   // Reset all blocks
   resetAllBlocks: () => {
-    const { basePrice, settings } = get();
-    set({
-      blocks: generatePriceBlocks(basePrice, settings.gridSize),
-      orders: [],
-      trades: [],
-    });
+    get().regenerateBlocks();
   },
   
   // Update settings
@@ -256,17 +451,15 @@ export const useTradingStore = create((set, get) => ({
     return get().orders.filter(o => o.state === 'ARMED').length;
   },
   
-  // Get total P&L (simplified)
+  // Get total P&L
   getTotalPnL: () => {
     const { trades, currentPrice } = get();
     let pnl = 0;
     
     trades.forEach(trade => {
       if (trade.side === Side.BUY) {
-        // Bought at execPrice, current value is currentPrice
         pnl += (currentPrice - trade.execPrice) * trade.qty;
       } else {
-        // Sold at execPrice
         pnl += (trade.execPrice - currentPrice) * trade.qty;
       }
     });
