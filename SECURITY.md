@@ -11,7 +11,7 @@ Please **do not open public issues** for suspected vulnerabilities.
 Preferred channel:
 
 1. Use **GitHub Security Advisories** for this repository:
-   `https://github.com/OWNER/REPO/security/advisories/new`
+   `https://github.com/darshan09/pricegrid/security/advisories/new`
 
 Alternative (if advisory creation is unavailable):
 

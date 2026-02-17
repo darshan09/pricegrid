@@ -1,32 +1,25 @@
-# Tap-to-Trade Grid
+# pricegrid
 
-A lightweight trading-simulator UI that lets users arm price levels on a live ladder, trigger simulated executions, square off positions, and monitor running P&L.
+A new take on the trading ladder — instead of a scrolling list of price levels, **pricegrid** displays prices as a spatial grid of tappable blocks. Arm a block, watch the market move, and execute — all without a traditional order form.
 
-## Open Source Status
+This is a simulation UI exploring whether a grid-based interaction model could be a faster, more intuitive way to trade. It's an open experiment, and contributions are very welcome.
 
-This repository is open source under the **GNU AGPL v3** license.
+![Armed positions with live P&L](./docs/screenshot-grid.png)
+![Square off all positions](./docs/screenshot-squareoff.png)
 
-- You can use, modify, and redistribute it under AGPL terms.
-- If you run a modified version as a network service, you must provide corresponding source to users of that service.
+## What it does
 
-See [`LICENSE`](./LICENSE) for full text.
+- Displays live price levels as a grid of blocks
+- Tap to arm a price level; execution triggers automatically when price is hit
+- Tracks open positions and running P&L in real time
+- Trade log with per-trade entry price, target, and live P&L
+- Simulated execution — no real orders, safe to experiment
 
-## Why AGPL?
+## Why open source?
 
-AGPL is a strong copyleft license intended to keep improvements open, including for hosted/SaaS-style deployments. It helps prevent closed-source forks of networked versions while still welcoming community contributions.
+This UI concept is experimental and probably too radical to ship without real-world feedback. The goal is to find out if others find it useful, get contributions that sharpen the idea, and build evidence of acceptance before integrating it into a real trading platform.
 
-## Project Policies
-
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
-- [`SECURITY.md`](./SECURITY.md)
-- [`GOVERNANCE.md`](./GOVERNANCE.md)
-
-## Project Structure
-
-- `frontend/` — React app (grid UI, simulation controls, chart, local trade state)
-- `backend/` — FastAPI service scaffold with Mongo-backed status endpoints
-- `tests/` — Python-side tests and reports
+If you trade, build trading tools, or just have opinions on UI — your feedback is genuinely valuable here.
 
 ## Quick Start
 
@@ -46,11 +39,22 @@ pip install -r requirements.txt
 uvicorn server:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Repository Setup Checklist (for maintainers)
+## Project Structure
 
-After pushing this repository publicly, update placeholders to finalize governance:
+- `frontend/` — React app (grid UI, simulation controls, trade log, P&L)
+- `backend/` — FastAPI service scaffold with Mongo-backed status endpoints
+- `tests/` — Python-side tests
 
-1. Replace `OWNER/REPO` in `SECURITY.md` and `.github/ISSUE_TEMPLATE/config.yml`.
-2. Update `.github/CODEOWNERS` with real GitHub usernames/teams.
-3. Configure branch protection + required reviews.
-4. Enable GitHub Security Advisories and Dependabot alerts.
+## Contributing
+
+Contributions, ideas, and criticism are all welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) to get started.
+
+## License
+
+GNU AGPL v3 — see [`LICENSE`](./LICENSE). If you run a modified version as a network service, you must provide corresponding source to users of that service.
+
+## Policies
+
+- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
+- [`SECURITY.md`](./SECURITY.md)
+- [`GOVERNANCE.md`](./GOVERNANCE.md)
