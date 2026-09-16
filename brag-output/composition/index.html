@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>pricegrid — brag</title>
+    <script src="assets/vendor/gsap.min.js"></script>
+    <script src="assets/audio-data.js"></script>
+    <style>
+      @font-face {
+        font-family: 'Manrope';
+        font-style: normal;
+        font-weight: 600;
+        src: url('assets/fonts/manrope-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Manrope';
+        font-style: normal;
+        font-weight: 800;
+        src: url('assets/fonts/manrope-800.woff2') format('woff2');
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --neon-lime: #e0ff66;
+        --neon-pink: #f555a2;
+        --dark-void: #0a0510;
+        --dark-card: #120a14;
+        --grid-color: #2a1c2b;
+        --grid-border: #3d2840;
+        --green: #22c55e;
+        --red: #ef4444;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--dark-void);
+        color: #fff;
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      .mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--dark-void);
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* ---------- persistent grid layer ---------- */
+      #grid-layer {
+        display: flex;
+        flex-direction: column;
+      }
+      #header-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 132px;
+        padding: 0 56px;
+        background: var(--dark-card);
+        border-bottom: 2px solid var(--grid-border);
+      }
+      #header-left {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+      }
+      #ticker-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 20px;
+        letter-spacing: 0.12em;
+        color: var(--neon-pink);
+        font-weight: 700;
+      }
+      #ticker-price {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 52px;
+        font-weight: 700;
+        color: #fff;
+        text-shadow: 0 0 24px rgba(245, 85, 162, 0.6);
+      }
+      #header-stats {
+        display: flex;
+        gap: 56px;
+      }
+      .stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .stat-label {
+        font-size: 14px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #ffa9cd;
+      }
+      .stat-value {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--neon-lime);
+      }
+      #header-side {
+        display: flex;
+        border: 2px solid var(--grid-border);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .side-btn {
+        padding: 12px 34px;
+        font-size: 16px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .side-btn.buy {
+        color: #ffa9cd;
+      }
+      .side-btn.sell {
+        background: #b91c1c;
+        color: #fff;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+      }
+
+      /* reserved band under the header, kept free of grid blocks so the scene
+         2/3/4 lower-third labels never overlap price-block text */
+      #caption-zone {
+        height: 110px;
+        flex-shrink: 0;
+      }
+      #grid-wrap {
+        position: relative;
+        flex: 1;
+        padding: 24px 56px 42px;
+      }
+      #price-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 18px;
+        width: 100%;
+        height: 100%;
+      }
+      .pgblock {
+        position: relative;
+        border-radius: 10px;
+        border: 2px solid var(--grid-border);
+        background: var(--dark-card);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        opacity: 0;
+      }
+      .pgblock .pg-price {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 30px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .pgblock .pg-delta {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .pgblock .pg-pct {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        opacity: 0.65;
+      }
+      .pg-delta.up,
+      .pg-pct.up {
+        color: var(--neon-lime);
+      }
+      .pg-delta.down,
+      .pg-pct.down {
+        color: var(--neon-pink);
+      }
+      .pgblock.is-armed {
+        border-color: var(--neon-lime);
+        background: rgba(224, 255, 102, 0.16);
+      }
+      .pgblock.is-armed .pg-price {
+        color: var(--neon-lime);
+      }
+      .pgblock.is-executed {
+        border-color: var(--green);
+        background: rgba(34, 197, 94, 0.28);
+        box-shadow: 0 0 36px rgba(34, 197, 94, 0.55);
+      }
+      .pgblock.is-executed .pg-price {
+        color: var(--green);
+      }
+      /* hide the block's own pct line once armed/executed — the armed-tag / pnl-tag
+         overlays occupy that same bottom-corner space and would otherwise collide */
+      .pgblock.is-armed .pg-pct,
+      .pgblock.is-executed .pg-pct {
+        opacity: 0;
+      }
+      .armed-tag {
+        position: absolute;
+        bottom: 8px;
+        font-size: 11px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--neon-lime);
+        font-family: 'JetBrains Mono', monospace;
+        opacity: 0;
+      }
+      .pnl-tag {
+        position: absolute;
+        bottom: 8px;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--green);
+        font-family: 'JetBrains Mono', monospace;
+        opacity: 0;
+      }
+
+      #glow-ring {
+        position: absolute;
+        width: 260px;
+        height: 168px;
+        border-radius: 14px;
+        pointer-events: none;
+        opacity: 0;
+        box-shadow: 0 0 0 rgba(224, 255, 102, 0);
+      }
+
+      /* cursor dots are appended as children of their target element (the armed
+         block, the confirm button) and centered on it with pure CSS inset/margin —
+         no runtime layout measurement needed. Entry motion is a relative GSAP x/y. */
+      .cursor-dot {
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 0 22px rgba(255, 255, 255, 0.9);
+        z-index: 50;
+        pointer-events: none;
+      }
+
+      /* ---------- scene labels (sit in the reserved caption-zone band, never over the grid) ---------- */
+      .lower-third {
+        position: absolute;
+        left: 56px;
+        top: 156px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        opacity: 0;
+      }
+      .lower-third .bar {
+        width: 6px;
+        height: 56px;
+        background: var(--neon-lime);
+        border-radius: 3px;
+      }
+      .lower-third h2 {
+        font-size: 48px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        text-shadow: 0 0 30px rgba(224, 255, 102, 0.35);
+      }
+
+      /* ---------- scene 1 hook ---------- */
+      #scene1-hook {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      #scene1-hook::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at center, rgba(10, 5, 16, 0.55) 0%, rgba(10, 5, 16, 0.15) 60%, transparent 100%);
+      }
+      #hook-line {
+        position: relative;
+        font-size: 108px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        opacity: 0;
+        text-shadow: 0 0 50px rgba(224, 255, 102, 0.4);
+      }
+
+      /* ---------- scene 4 square off ---------- */
+      #scene4-overlay {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #dim-scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(10, 5, 16, 0.74);
+        opacity: 0;
+      }
+      #dialog {
+        position: relative;
+        width: 780px;
+        background: var(--dark-card);
+        border: 2px solid var(--grid-border);
+        border-radius: 18px;
+        padding: 46px 52px;
+        opacity: 0;
+      }
+      #dialog-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 38px;
+        font-weight: 800;
+      }
+      #dialog-title .dollar {
+        color: var(--neon-lime);
+      }
+      #dialog-desc {
+        margin-top: 18px;
+        font-size: 22px;
+        color: rgba(245, 85, 162, 0.9);
+        font-family: 'JetBrains Mono', monospace;
+      }
+      #dialog-desc b {
+        color: var(--neon-lime);
+      }
+      #dialog-buttons {
+        margin-top: 38px;
+        display: flex;
+        gap: 18px;
+      }
+      .dlg-btn {
+        position: relative;
+        flex: 1;
+        text-align: center;
+        padding: 20px 0;
+        border-radius: 10px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      #btn-keep {
+        background: #241a28;
+        color: #fff;
+        border: 2px solid var(--grid-border);
+      }
+      #btn-confirm {
+        background: var(--neon-lime);
+        color: #0a0510;
+      }
+
+      /* ---------- scene 5 outro ---------- */
+      #scene5-outro {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--dark-void);
+        gap: 26px;
+        text-align: center;
+      }
+      #outro-title {
+        font-size: 128px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: var(--neon-lime);
+        opacity: 0;
+      }
+      #outro-tagline {
+        font-size: 34px;
+        font-weight: 600;
+        color: #fff;
+        opacity: 0;
+      }
+      #outro-cta {
+        font-size: 30px;
+        font-weight: 700;
+        color: var(--neon-pink);
+        font-family: 'JetBrains Mono', monospace;
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="pricegrid-brag" data-start="0" data-width="1920" data-height="1080" data-duration="19">
+      <!-- persistent grid layer: scenes 1-4 -->
+      <div id="grid-layer" class="clip" data-start="0" data-duration="15" data-track-index="1">
+        <div id="header-bar" data-layout-allow-occlusion="true" data-layout-allow-overlap="true">
+          <div id="header-left">
+            <span id="ticker-label">NIFTY</span>
+            <span id="ticker-price" class="mono">&#8377;2006.10</span>
+          </div>
+          <div id="header-stats">
+            <div class="stat"><span class="stat-label">Armed</span><span class="stat-value" id="stat-armed">0</span></div>
+            <div class="stat"><span class="stat-label">Open</span><span class="stat-value" id="stat-open" style="color:#fff">0</span></div>
+            <div class="stat"><span class="stat-label">P&amp;L</span><span class="stat-value" id="stat-pnl">+&#8377;0.00</span></div>
+          </div>
+          <div id="header-side">
+            <div class="side-btn buy">Buy</div>
+            <div class="side-btn sell">Sell</div>
+          </div>
+        </div>
+        <div id="caption-zone"></div>
+        <div id="grid-wrap" data-layout-allow-occlusion="true" data-layout-allow-overlap="true">
+          <div id="price-grid">
+            <div class="pgblock" id="blk-0" data-price="2011.50"><span class="pg-price">&#8377;2,011.50</span><span class="pg-delta up">&#8599; &#8377;5.40</span><span class="pg-pct up">+0.27%</span></div>
+      <div class="pgblock" id="blk-1" data-price="2011.25"><span class="pg-price">&#8377;2,011.25</span><span class="pg-delta up">&#8599; &#8377;5.15</span><span class="pg-pct up">+0.26%</span></div>
+      <div class="pgblock" id="blk-2" data-price="2011.00"><span class="pg-price">&#8377;2,011.00</span><span class="pg-delta up">&#8599; &#8377;4.90</span><span class="pg-pct up">+0.24%</span></div>
+      <div class="pgblock" id="blk-3" data-price="2010.75"><span class="pg-price">&#8377;2,010.75</span><span class="pg-delta up">&#8599; &#8377;4.65</span><span class="pg-pct up">+0.23%</span></div>
+      <div class="pgblock" id="blk-4" data-price="2010.50"><span class="pg-price">&#8377;2,010.50</span><span class="pg-delta up">&#8599; &#8377;4.40</span><span class="pg-pct up">+0.22%</span></div>
+      <div class="pgblock" id="blk-5" data-price="2010.25"><span class="pg-price">&#8377;2,010.25</span><span class="pg-delta up">&#8599; &#8377;4.15</span><span class="pg-pct up">+0.21%</span></div>
+      <div class="pgblock" id="blk-6" data-price="2010.00"><span class="pg-price">&#8377;2,010.00</span><span class="pg-delta up">&#8599; &#8377;3.90</span><span class="pg-pct up">+0.19%</span></div>
+      <div class="pgblock" id="blk-7" data-price="2009.75"><span class="pg-price">&#8377;2,009.75</span><span class="pg-delta up">&#8599; &#8377;3.65</span><span class="pg-pct up">+0.18%</span></div>
+      <div class="pgblock" id="blk-8" data-price="2009.50"><span class="pg-price">&#8377;2,009.50</span><span class="pg-delta up">&#8599; &#8377;3.40</span><span class="pg-pct up">+0.17%</span></div>
+      <div class="pgblock" id="blk-9" data-price="2009.25"><span class="pg-price">&#8377;2,009.25</span><span class="pg-delta up">&#8599; &#8377;3.15</span><span class="pg-pct up">+0.16%</span></div>
+      <div class="pgblock" id="blk-10" data-price="2009.00"><span class="pg-price">&#8377;2,009.00</span><span class="pg-delta up">&#8599; &#8377;2.90</span><span class="pg-pct up">+0.14%</span></div>
+      <div class="pgblock pgblock-target" id="blk-11" data-price="2008.75"><span class="pg-price">&#8377;2,008.75</span><span class="pg-delta up">&#8599; &#8377;2.65</span><span class="pg-pct up">+0.13%</span></div>
+      <div class="pgblock" id="blk-12" data-price="2008.50"><span class="pg-price">&#8377;2,008.50</span><span class="pg-delta up">&#8599; &#8377;2.40</span><span class="pg-pct up">+0.12%</span></div>
+      <div class="pgblock" id="blk-13" data-price="2008.25"><span class="pg-price">&#8377;2,008.25</span><span class="pg-delta up">&#8599; &#8377;2.15</span><span class="pg-pct up">+0.11%</span></div>
+      <div class="pgblock" id="blk-14" data-price="2008.00"><span class="pg-price">&#8377;2,008.00</span><span class="pg-delta up">&#8599; &#8377;1.90</span><span class="pg-pct up">+0.09%</span></div>
+      <div class="pgblock" id="blk-15" data-price="2007.75"><span class="pg-price">&#8377;2,007.75</span><span class="pg-delta up">&#8599; &#8377;1.65</span><span class="pg-pct up">+0.08%</span></div>
+      <div class="pgblock" id="blk-16" data-price="2007.50"><span class="pg-price">&#8377;2,007.50</span><span class="pg-delta up">&#8599; &#8377;1.40</span><span class="pg-pct up">+0.07%</span></div>
+      <div class="pgblock" id="blk-17" data-price="2007.25"><span class="pg-price">&#8377;2,007.25</span><span class="pg-delta up">&#8599; &#8377;1.15</span><span class="pg-pct up">+0.06%</span></div>
+      <div class="pgblock" id="blk-18" data-price="2007.00"><span class="pg-price">&#8377;2,007.00</span><span class="pg-delta up">&#8599; &#8377;0.90</span><span class="pg-pct up">+0.04%</span></div>
+      <div class="pgblock" id="blk-19" data-price="2006.75"><span class="pg-price">&#8377;2,006.75</span><span class="pg-delta up">&#8599; &#8377;0.65</span><span class="pg-pct up">+0.03%</span></div>
+      <div class="pgblock" id="blk-20" data-price="2006.50"><span class="pg-price">&#8377;2,006.50</span><span class="pg-delta up">&#8599; &#8377;0.40</span><span class="pg-pct up">+0.02%</span></div>
+      <div class="pgblock" id="blk-21" data-price="2006.25"><span class="pg-price">&#8377;2,006.25</span><span class="pg-delta up">&#8599; &#8377;0.15</span><span class="pg-pct up">+0.01%</span></div>
+      <div class="pgblock" id="blk-22" data-price="2006.00"><span class="pg-price">&#8377;2,006.00</span><span class="pg-delta down">&#8600; &#8377;0.10</span><span class="pg-pct down">-0.00%</span></div>
+      <div class="pgblock" id="blk-23" data-price="2005.75"><span class="pg-price">&#8377;2,005.75</span><span class="pg-delta down">&#8600; &#8377;0.35</span><span class="pg-pct down">-0.02%</span></div>
+      <div class="pgblock" id="blk-24" data-price="2005.50"><span class="pg-price">&#8377;2,005.50</span><span class="pg-delta down">&#8600; &#8377;0.60</span><span class="pg-pct down">-0.03%</span></div>
+      <div class="pgblock" id="blk-25" data-price="2005.25"><span class="pg-price">&#8377;2,005.25</span><span class="pg-delta down">&#8600; &#8377;0.85</span><span class="pg-pct down">-0.04%</span></div>
+      <div class="pgblock" id="blk-26" data-price="2005.00"><span class="pg-price">&#8377;2,005.00</span><span class="pg-delta down">&#8600; &#8377;1.10</span><span class="pg-pct down">-0.05%</span></div>
+      <div class="pgblock" id="blk-27" data-price="2004.75"><span class="pg-price">&#8377;2,004.75</span><span class="pg-delta down">&#8600; &#8377;1.35</span><span class="pg-pct down">-0.07%</span></div>
+      <div class="pgblock" id="blk-28" data-price="2004.50"><span class="pg-price">&#8377;2,004.50</span><span class="pg-delta down">&#8600; &#8377;1.60</span><span class="pg-pct down">-0.08%</span></div>
+      <div class="pgblock" id="blk-29" data-price="2004.25"><span class="pg-price">&#8377;2,004.25</span><span class="pg-delta down">&#8600; &#8377;1.85</span><span class="pg-pct down">-0.09%</span></div>
+      <div class="pgblock" id="blk-30" data-price="2004.00"><span class="pg-price">&#8377;2,004.00</span><span class="pg-delta down">&#8600; &#8377;2.10</span><span class="pg-pct down">-0.10%</span></div>
+      <div class="pgblock" id="blk-31" data-price="2003.75"><span class="pg-price">&#8377;2,003.75</span><span class="pg-delta down">&#8600; &#8377;2.35</span><span class="pg-pct down">-0.12%</span></div>
+      <div class="pgblock" id="blk-32" data-price="2003.50"><span class="pg-price">&#8377;2,003.50</span><span class="pg-delta down">&#8600; &#8377;2.60</span><span class="pg-pct down">-0.13%</span></div>
+      <div class="pgblock" id="blk-33" data-price="2003.25"><span class="pg-price">&#8377;2,003.25</span><span class="pg-delta down">&#8600; &#8377;2.85</span><span class="pg-pct down">-0.14%</span></div>
+      <div class="pgblock" id="blk-34" data-price="2003.00"><span class="pg-price">&#8377;2,003.00</span><span class="pg-delta down">&#8600; &#8377;3.10</span><span class="pg-pct down">-0.15%</span></div>
+      <div class="pgblock" id="blk-35" data-price="2002.75"><span class="pg-price">&#8377;2,002.75</span><span class="pg-delta down">&#8600; &#8377;3.35</span><span class="pg-pct down">-0.17%</span></div>
+      <div class="pgblock" id="blk-36" data-price="2002.50"><span class="pg-price">&#8377;2,002.50</span><span class="pg-delta down">&#8600; &#8377;3.60</span><span class="pg-pct down">-0.18%</span></div>
+      <div class="pgblock" id="blk-37" data-price="2002.25"><span class="pg-price">&#8377;2,002.25</span><span class="pg-delta down">&#8600; &#8377;3.85</span><span class="pg-pct down">-0.19%</span></div>
+      <div class="pgblock" id="blk-38" data-price="2002.00"><span class="pg-price">&#8377;2,002.00</span><span class="pg-delta down">&#8600; &#8377;4.10</span><span class="pg-pct down">-0.20%</span></div>
+      <div class="pgblock" id="blk-39" data-price="2001.75"><span class="pg-price">&#8377;2,001.75</span><span class="pg-delta down">&#8600; &#8377;4.35</span><span class="pg-pct down">-0.22%</span></div>
+      <div class="pgblock" id="blk-40" data-price="2001.50"><span class="pg-price">&#8377;2,001.50</span><span class="pg-delta down">&#8600; &#8377;4.60</span><span class="pg-pct down">-0.23%</span></div>
+      <div class="pgblock" id="blk-41" data-price="2001.25"><span class="pg-price">&#8377;2,001.25</span><span class="pg-delta down">&#8600; &#8377;4.85</span><span class="pg-pct down">-0.24%</span></div>
+          </div>
+          <div id="glow-ring"></div>
+          <span class="armed-tag" id="armed-tag" data-layout-allow-overlap="true">Armed</span>
+          <span class="pnl-tag" id="pnl-tag" data-layout-allow-overlap="true">+&#8377;0.00</span>
+        </div>
+      </div>
+
+      <!-- scene 1: hook -->
+      <div id="scene1-hook" class="clip" data-start="0" data-duration="3" data-track-index="2">
+        <h1 id="hook-line" data-layout-allow-overlap="true">FORGET THE LADDER.</h1>
+      </div>
+
+      <!-- scene 2: arm a level -->
+      <div id="scene2-label" class="clip" data-start="3" data-duration="4" data-track-index="2">
+        <div class="lower-third" id="label2"><span class="bar"></span><h2>ARM A LEVEL.</h2></div>
+      </div>
+
+      <!-- scene 3: it executes itself -->
+      <div id="scene3-label" class="clip" data-start="7" data-duration="4" data-track-index="2">
+        <div class="lower-third" id="label3"><span class="bar" style="background:var(--green)"></span><h2>IT EXECUTES ITSELF.</h2></div>
+      </div>
+
+      <!-- scene 4: square off -->
+      <div id="scene4-overlay" class="clip" data-start="11" data-duration="4" data-track-index="3">
+        <div id="dim-scrim" data-layout-allow-occlusion="true"></div>
+        <div class="lower-third" id="label4"><span class="bar"></span><h2>SQUARE OFF, INSTANTLY.</h2></div>
+        <div id="dialog" data-layout-allow-occlusion="true">
+          <div id="dialog-title" data-layout-allow-overlap="true"><span class="dollar" data-layout-allow-overlap="true">$</span><span data-layout-allow-overlap="true">Square Off All Positions?</span></div>
+          <div id="dialog-desc" data-layout-allow-overlap="true">Square off all 6 open positions? Total P&amp;L: <b>+&#8377;106.23</b></div>
+          <div id="dialog-buttons">
+            <div class="dlg-btn" id="btn-keep" data-layout-allow-overlap="true">No, Keep Them</div>
+            <div class="dlg-btn" id="btn-confirm" data-layout-allow-overlap="true">Yes, Square Off All</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- scene 5: outro -->
+      <div id="scene5-outro" class="clip" data-start="15" data-duration="4" data-track-index="4">
+        <div id="outro-title">pricegrid</div>
+        <div id="outro-tagline">An open trading UI experiment.</div>
+        <div id="outro-cta">Tap it. Break it. Fork it.</div>
+      </div>
+
+      <!-- audio -->
+      <audio id="bgm" src="assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3" data-start="0" data-duration="19" data-track-index="10" data-volume="1"></audio>
+      <audio id="sfx-hook" src="assets/sfx/impactSoft_medium_001.ogg" data-start="1.6" data-track-index="11" data-volume="0.9"></audio>
+      <audio id="sfx-arm" src="assets/sfx/click_003.ogg" data-start="3.6" data-track-index="12" data-volume="1"></audio>
+      <audio id="sfx-execute" src="assets/sfx/bong_001.ogg" data-start="7.2" data-track-index="13" data-volume="1"></audio>
+      <audio id="sfx-dialog" src="assets/sfx/drop_001.ogg" data-start="11.3" data-track-index="14" data-volume="0.85"></audio>
+      <audio id="sfx-confirm" src="assets/sfx/click_002.ogg" data-start="13.5" data-track-index="15" data-volume="1"></audio>
+    </div>
+
+    <script>
+      (function () {
+        var tl = gsap.timeline({ paused: true });
+        var blocks = gsap.utils.toArray('.pgblock');
+        var target = document.getElementById('blk-11');
+        var glowRing = document.getElementById('glow-ring');
+        var armedTag = document.getElementById('armed-tag');
+        var pnlTag = document.getElementById('pnl-tag');
+        var statArmed = document.getElementById('stat-armed');
+        var statOpen = document.getElementById('stat-open');
+        var statPnl = document.getElementById('stat-pnl');
+        var confirmBtn = document.getElementById('btn-confirm');
+
+        // cursor dots live inside their target element (pure CSS inset/margin
+        // centering), so no runtime layout measurement is needed to place them —
+        // entry/tap motion is authored as a relative GSAP x/y transform.
+        var cursorArm = document.createElement('div');
+        cursorArm.className = 'cursor-dot';
+        target.appendChild(cursorArm);
+        var cursorConfirm = document.createElement('div');
+        cursorConfirm.className = 'cursor-dot';
+        confirmBtn.appendChild(cursorConfirm);
+        gsap.set([cursorArm, cursorConfirm], { scale: 0 });
+
+        // position the armed/executed glow ring and P&L tag over the target block —
+        // these are children of #grid-wrap, sized/placed with plain CSS (grid column
+        // math via nth-child would be fragile; instead they share the block's own
+        // flex box by being absolutely inset over the whole grid and offset with a
+        // one-time layout read at build time, before any timed clip visibility can differ
+        // — the grid layer is visible for the whole [0,15) window this reads within).
+        (function placeGlow() {
+          var wrap = document.getElementById('grid-wrap');
+          function place() {
+            var wrapRect = wrap.getBoundingClientRect();
+            var r = target.getBoundingClientRect();
+            var cx = r.left - wrapRect.left + r.width / 2;
+            glowRing.style.left = r.left - wrapRect.left - 4 + 'px';
+            glowRing.style.top = r.top - wrapRect.top - 4 + 'px';
+            glowRing.style.width = r.width + 8 + 'px';
+            glowRing.style.height = r.height + 8 + 'px';
+            armedTag.style.left = cx + 'px';
+            armedTag.style.top = r.top - wrapRect.top + r.height - 26 + 'px';
+            armedTag.style.transform = 'translateX(-50%)';
+            pnlTag.style.left = cx + 'px';
+            pnlTag.style.top = r.top - wrapRect.top + r.height - 26 + 'px';
+            pnlTag.style.transform = 'translateX(-50%)';
+          }
+          place();
+          window.addEventListener('resize', place);
+        })();
+
+        // stable resting state for glow-ring before scene 2's first fromTo runs
+        // (avoids gsap_repeated_fromto_without_baseline: two fromTo calls target
+        // #glow-ring later, so any seek before the first must not inherit whichever
+        // fromTo's "from" values were authored last)
+        tl.set(glowRing, { opacity: 0, boxShadow: '0 0 0px rgba(224,255,102,0)' }, 0);
+
+        // ---------- SCENE 1: grid assembly + hook ----------
+        tl.fromTo(
+          blocks,
+          { opacity: 0, scale: 0.6 },
+          { opacity: 1, scale: 1, duration: 0.45, ease: 'back.out(1.6)', stagger: 0.018 },
+          0.1
+        );
+        tl.fromTo(
+          '#hook-line',
+          { opacity: 0, scale: 1.22 },
+          { opacity: 1, scale: 1, duration: 0.38, ease: 'power3.out' },
+          1.58 // beat-locked: 1.60s
+        );
+        tl.to('#hook-line', { opacity: 0, duration: 0.3, ease: 'power1.in' }, 2.7);
+
+        // ---------- SCENE 2: arm a level ----------
+        // cursor travels in and taps the target block (relative transform, no measured position)
+        tl.set(cursorArm, { x: 420, y: -160, scale: 1 }, 3.05);
+        tl.to(cursorArm, { x: 0, y: 0, duration: 0.5, ease: 'power2.inOut' }, 3.1);
+        tl.to(cursorArm, { scale: 0.55, duration: 0.12, ease: 'power1.in' }, 3.58); // tap-down
+        tl.to(cursorArm, { scale: 1, duration: 0.16, ease: 'back.out(2)' }, 3.7);
+
+        tl.call(
+          function () {
+            target.classList.add('is-armed');
+          },
+          [],
+          3.62 // beat-grid: arm flip near 6.34s window traded for readability at the tap moment
+        );
+        tl.fromTo(
+          glowRing,
+          { opacity: 0, boxShadow: '0 0 0px rgba(224,255,102,0)' },
+          { opacity: 1, boxShadow: '0 0 26px rgba(224,255,102,0.35)', duration: 0.25 },
+          3.62
+        );
+        // finite pulsing breath, computed (not repeat:-1)
+        tl.to(
+          glowRing,
+          {
+            boxShadow: '0 0 46px rgba(224,255,102,0.7)',
+            duration: 0.4,
+            repeat: 7,
+            yoyo: true,
+            ease: 'sine.inOut',
+          },
+          3.87
+        );
+        tl.to(armedTag, { opacity: 1, duration: 0.2 }, 3.75);
+        tl.fromTo('#label2', { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' }, 3.62);
+        tl.call(function () { statArmed.textContent = '1'; }, [], 3.62);
+        tl.to('#label2', { opacity: 0, duration: 0.3 }, 6.7);
+        tl.to(cursorArm, { scale: 0, duration: 0.2 }, 6.9);
+
+        // ---------- SCENE 3: it executes itself ----------
+        tl.call(
+          function () {
+            target.classList.remove('is-armed');
+            target.classList.add('is-executed');
+            armedTag.style.opacity = 0;
+          },
+          [],
+          7.15 // beat-grid: execute flip near 8.96s traded for readability; landing on the scene's own beat instead
+        );
+        // continues from the armed pulse's resting boxShadow — no new "from" baseline needed
+        tl.to(glowRing, { boxShadow: '0 0 60px rgba(34,197,94,0.7)', duration: 0.3, ease: 'power2.out' }, 7.15);
+        tl.to(pnlTag, { opacity: 1, duration: 0.2 }, 7.3);
+        var pnlCounter = { v: 0 };
+        tl.to(
+          pnlCounter,
+          {
+            v: 53.03,
+            duration: 1,
+            ease: 'power1.out',
+            onUpdate: function () {
+              pnlTag.textContent = '+₹' + pnlCounter.v.toFixed(2);
+            },
+          },
+          7.3
+        );
+        tl.call(
+          function () {
+            statOpen.textContent = '1';
+            statOpen.style.color = 'var(--green)';
+            statPnl.textContent = '+₹53.03';
+          },
+          [],
+          8.3
+        );
+        tl.fromTo('#label3', { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' }, 7.15);
+        tl.to('#label3', { opacity: 0, duration: 0.3 }, 10.7);
+
+        // ---------- SCENE 4: square off ----------
+        tl.to('#dim-scrim', { opacity: 1, duration: 0.3 }, 11.0);
+        tl.fromTo('#dialog', { opacity: 0, scale: 0.85 }, { opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(1.5)' }, 11.3);
+        tl.fromTo('#label4', { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' }, 11.3);
+        // cursor moves to confirm button and taps it (relative transform again)
+        tl.set(cursorConfirm, { x: -260, y: 180, scale: 1 }, 12.6);
+        tl.to(cursorConfirm, { x: 0, y: 0, duration: 0.5, ease: 'power2.inOut' }, 13.0);
+        tl.to(cursorConfirm, { scale: 0.55, duration: 0.12 }, 13.48);
+        tl.to(cursorConfirm, { scale: 1, duration: 0.16, ease: 'back.out(2)' }, 13.6);
+        tl.to('#btn-confirm', { scale: 0.94, duration: 0.1 }, 13.5);
+        tl.to('#btn-confirm', { scale: 1, duration: 0.18, ease: 'back.out(2)' }, 13.62);
+        tl.call(
+          function () {
+            statPnl.textContent = '+₹106.23';
+            statOpen.textContent = '0';
+            statArmed.textContent = '0';
+          },
+          [],
+          13.7
+        );
+        tl.to(['#dialog', '#label4'], { opacity: 0, duration: 0.3 }, 14.35);
+        tl.to('#dim-scrim', { opacity: 0, duration: 0.3 }, 14.35);
+        tl.to(cursorConfirm, { scale: 0, duration: 0.2 }, 14.4);
+
+        // ---------- SCENE 5: outro ----------
+        tl.fromTo('#outro-title', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 15.2);
+        tl.fromTo('#outro-tagline', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 15.55);
+        tl.fromTo('#outro-cta', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 17.0);
+        tl.to(['#outro-title', '#outro-tagline', '#outro-cta'], { opacity: 0, duration: 0.3, ease: 'power1.in' }, 18.6);
+
+        // ---------- music volume arc ----------
+        tl.set('#bgm', { volume: 0.35 }, 0);
+        tl.to('#bgm', { volume: 0.68, duration: 1.4, ease: 'power1.in' }, 1.6);
+        tl.to('#bgm', { volume: 0.68, duration: 3.2 }, 3.0);
+        tl.to('#bgm', { volume: 0.85, duration: 1.2, ease: 'power1.in' }, 6.6);
+        tl.to('#bgm', { volume: 0.85, duration: 6.9 }, 7.8);
+        tl.to('#bgm', { volume: 0.15, duration: 2.2, ease: 'power2.out' }, 16.5);
+
+        // ---------- audio-reactive: subtle bass-driven glow on the hook line ----------
+        // sampled per frame across scene 1's hold (t=1.6 to 3.0), low HF cost, isolated single element.
+        if (window.AUDIO_DATA && window.AUDIO_DATA.frames && window.AUDIO_DATA.frames.length) {
+          var AD = window.AUDIO_DATA;
+          var hookLine = document.getElementById('hook-line');
+          var startT = 1.6;
+          var endT = 3.0;
+          var startFrame = Math.floor(startT * AD.fps);
+          var endFrame = Math.min(AD.totalFrames - 1, Math.floor(endT * AD.fps));
+          for (var f = startFrame; f <= endFrame; f++) {
+            (function (frameData, atTime) {
+              tl.call(
+                function () {
+                  var bass = frameData.bands[0] || 0;
+                  var spread = 40 + bass * 26; // subtle 40-66px glow spread
+                  hookLine.style.textShadow = '0 0 ' + spread.toFixed(1) + 'px rgba(224,255,102,' + (0.32 + bass * 0.18).toFixed(2) + ')';
+                },
+                [],
+                atTime
+              );
+            })(AD.frames[f], f / AD.fps);
+          }
+        }
+
+        window.__timelines['pricegrid-brag'] = tl;
+        tl.seek(0);
+      })();
+    </script>
+  </body>
+</html>

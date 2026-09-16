@@ -1,0 +1,3 @@
+pricegrid.
+Instead of a scrolling ladder, your order book is a grid you tap. Arm a level, watch it execute itself, square off in one shot.
+An open source trading UI experiment — try it, break it, fork it.
